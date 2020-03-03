@@ -12,7 +12,13 @@ public class GraphResource {
 	public String graphUri = null;
 
 	boolean populateProperties = false;	
-	List<Attribute> properties = new LinkedList<>();
+	
+	boolean isReference = false;
+	
+	List<Attribute> properties = null;
+	
+	public enum ATTRIBUTE_RESTRICTION {MAX_CARDINALITY, MIN_CARDINALITY};
+	
 	
 	public GraphResource() {
 	}
@@ -48,10 +54,14 @@ public class GraphResource {
 	 * Get list of object properties
 	 */
 	public List<Attribute> getAttributes() {
+		if( properties == null)
+			properties = new LinkedList<>();
 		return properties;
 	}
 
 	public List<String> getAttributeValues( String name) {
+		if( properties == null)
+			properties = new LinkedList<>();
 		LinkedList<String> ret = new LinkedList<>();
 		for(Attribute a: properties) {
 			if( a.name.equals(name)) 
@@ -59,6 +69,20 @@ public class GraphResource {
 		}
 		return ret;
 	}
+	
+	/*
+	 * Use only when you know there is a single value
+	 */
+	public String getAttributeValue( String name) {
+		if( properties == null)
+			properties = new LinkedList<>();
+		for(Attribute a: properties) {
+			if( a.name.equals(name)) 
+					return a.value;
+		}
+		return null;
+	}
+	
 	
 	public void setAttributes(List<Attribute> properties) {
 		this.properties = properties;
@@ -86,23 +110,48 @@ public class GraphResource {
 	public String toString() {
 		
 		String ret = types[0] + ": " + uri + "; ";
-		for( Attribute a : properties ) {
-			ret+= a.name + " = " + a.value + ", ";
+			if( properties != null) {
+			for( Attribute a : properties ) {
+				ret+= a.name + " = " + a.value + ", ";
+			}
 		}
 		return ret;
 		
 	}
 	
+	
+	public boolean isReference() {
+		return isReference;
+	}
+
+	public void setReference(boolean isReference) {
+		this.isReference = isReference;
+	}
+	
 	public class Attribute {
 		  public String name;
+		  public String uri;
 		  public String value;
+		  public AttributeRestriction restriction;
 		  
-		  public Attribute( String n, String v) {
+		  public Attribute( String n, String uri, String v) {
 			  this.name = n;
 			  this.value = v;
+			  this.uri = uri;
 		  }
 		  
 	}
+	
+	public class AttributeRestriction {
+		public ATTRIBUTE_RESTRICTION restriction;
+		public int value;
+		
+		public AttributeRestriction( ATTRIBUTE_RESTRICTION res, int val) {
+			this.restriction = res;
+			this.value = val;
+		}
+	}
+	
 	
 
 
