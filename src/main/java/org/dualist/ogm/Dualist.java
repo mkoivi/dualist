@@ -83,10 +83,10 @@ public class Dualist {
 	/*
 	 * Jena/OWL - Java POJO mapping layer.
 	 * 
-	 * Mapping is bidirectional: from OWL graph to Java and Java to OWL -Maps
-	 * the OWL classes and properties to Java using @OWLResource
-	 * and @OWLProperty annotations. -Java classes must be inherited from
-	 * FacetResource class. -OWL - pojo mapping relies on method naming
+	 * Mapping is bidirectional: from OWL graph to Java and Java to OWL 
+	 * -Maps the OWL classes and properties to Java using @OWLResource and @OWLProperty annotations. 
+	 * -Java classes must be inherited from FacetResource class. 
+	 * -OWL - pojo mapping relies on method naming
 	 * convention: all annotated Java properties must have public getter and
 	 * setter methods.
 	 */
