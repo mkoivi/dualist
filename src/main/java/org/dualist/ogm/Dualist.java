@@ -1342,7 +1342,7 @@ public class Dualist {
 					
 					if (ta.value().equals(predicate.toString())
 							|| model.expandPrefix(ta.value())
-									.equals(predicate.getURI()) || model.expandPrefix(ta.value2() ).equals(predicate.getURI()) || model.expandPrefix(ta.value3() ).equals(predicate.getURI()) || model.expandPrefix(ta.value4() ).equals(predicate.getURI()) || model.expandPrefix(ta.value5() ).equals(predicate.getURI())  )  {
+									.equals(predicate.getURI()) || model.expandPrefix(ta.value2() ).equals(predicate.getURI()) || model.expandPrefix(ta.value3() ).equals(predicate.getURI()) || model.expandPrefix(ta.value4() ).equals(predicate.getURI()) || model.expandPrefix(ta.value5() ).equals(predicate.getURI()) || model.expandPrefix(ta.value6() ).equals(predicate.getURI()) )  {
 						
 						// POJO annotation matched with predicate
 						

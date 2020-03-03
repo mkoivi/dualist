@@ -21,6 +21,7 @@ public @interface OWLProperty {
 	String value3() default "";
 	String value4() default "";
 	String value5() default "";
+	String value6() default "";
 	/* Use SPARQL query to select resources. Note! Returned resource uris must use variable ?result.
 	 * 
 	 */
