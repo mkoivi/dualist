@@ -1,7 +1,10 @@
 package org.dualist.ogm;
 
 import java.io.ByteArrayInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -44,6 +47,8 @@ import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.rdf.model.StmtIterator;
 import org.apache.jena.reasoner.Reasoner;
 import org.apache.jena.reasoner.ReasonerRegistry;
+import org.apache.jena.riot.Lang;
+import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.util.FileManager;
 import org.apache.jena.vocabulary.OWL2;
 import org.apache.jena.vocabulary.RDF;
@@ -92,6 +97,7 @@ public class Dualist {
 	 */
 	public Dualist() {
 		model = ModelFactory.createOntologyModel();
+
 	}
 
 	
@@ -155,6 +161,17 @@ public class Dualist {
 		model.write(System.out);
 	}
 	
+	public void saveModel( String fileName ) {
+		OutputStream out;
+		try {
+			out = new FileOutputStream(fileName);
+			RDFDataMgr.write(out, model, Lang.TURTLE);
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	
+	}
 	/* Initiate model reasoner (RDFS) and replace the original model with inferred model.
 	 * 
 	 * https://jena.apache.org/documentation/inference/#RDFSintro
@@ -438,44 +455,12 @@ public class Dualist {
 	}
 	
 	
-	/*
-	 * Modify a POJO resource in the graph. If resource exists, throws an exception.
-	 * This operation removes all existing triples relating to the resource and inserts from the pojo.
-	 * Note: this causes problems in case that 
-	 *
-	 */
-	public void modify(GraphResource res) throws ResourceNotExistException {
-		try {
-			log.debug("Dualist.modify " + res.getUri());
-
-			String uri = res.getUri();
-			Resource resource = null;
-			if( uri != null) {
-			// check if resource exists
-				resource = model.getResource(uri);
-				if( model.containsResource(resource)) {
-		//			model.removeAll(resource, null, (RDFNode) null);
-		//			model.removeAll(resource, null, (RDFNode) null);
-					delete( res);
-				}
-				else {
-					throw new ResourceNotExistException();
-				}
-
-			}
-
-			create( res );
-		} catch (Exception e) {
-			log.error("Exception during modifying of a graph ", e);
-		}
-	}
-	
 	
 	/*
-	 * Modifies a POJO resource in the graph.
-	 * 
+	 * Modifies a POJO resource in the graph. Does not delete the resource, just modifies the fields represented in this class
+	 * 	Does not work with alternative OWLProperty attributes (value2, value3....)
 	 */
-	public void softModify(GraphResource res) {
+	public void modify(GraphResource res) {
 		try {
 			System.out.println("Dualist.modify " + res.getUri());
 
@@ -492,56 +477,17 @@ public class Dualist {
 									// random hash
 				return;
 			}
-
 		
 			Field[] fields = getAllClassFields( res.getClass());
 			for (Field f : fields) {
 				if (f.isAnnotationPresent(OWLProperty.class)) {
-
-					OWLProperty ta = f.getAnnotation(OWLProperty.class);
-
-					Method getter = res.getClass()
-							.getMethod("get"
-									+ f.getName().substring(0, 1).toUpperCase()
-									+ f.getName().substring(1), null);
-
-					Object value = getter.invoke(res); // invoke getXXX method
-
-					if (value instanceof String) {
-
-						Property property = model
-								.getProperty(model.expandPrefix(ta.value()));
-
-						resource.removeAll(property);
-
-						resource.addProperty(property, value.toString());
-					} else if (value instanceof GraphResource) {
-						Property property = model
-								.getProperty(model.expandPrefix(ta.value()));
-
-						resource.removeAll(property);
-
-						Resource propResource = create(((GraphResource) value));
-						resource.addProperty(property, propResource);
-
-					} else if (value instanceof List) {
-						Property property = model
-								.getProperty(model.expandPrefix(ta.value()));
-						resource.removeAll(property);
-
-						for (GraphResource fr : (List<GraphResource>) value) {
-
-							// create the pojo if not exist
-							Resource propResource = model.getResource(fr.getUri());
-							if( propResource == null) {
-								propResource = create(fr);
-							}
-							resource.addProperty(property, propResource);
-						}
-						// Property property = model.getRDFNode(ta.value());
-						// resource.addProperty(property, value);
-					}
-
+					OWLProperty taf = f.getAnnotation(OWLProperty.class);
+					
+					Property property = model
+							.getProperty(model.expandPrefix(taf.value()));
+					resource.removeAll(property);
+					
+					createAttribute(f,  resource, res) ;
 				}
 			}
 			
@@ -558,22 +504,24 @@ public class Dualist {
 	/*
 	 * Updates an attribute of a pojo in the graph. 
 	 * 
-	 * attributeName is the Java class attribute name!
-	 *
+	 * attributeName is the Java class attribute name; graph attribute name is retrieved from OWLPropery annotation!
+	 * Does not work with alternative OWLProperty attributes (value2, value3....)
 	 */
 	public void modifyAttribute(GraphResource res, String attributeName) throws ResourceNotExistException {
 		try {
-			
-			
 			
 		Field field = getClassField(res.getClass(),attributeName);
 		if( field==null) {
 			log.error("No field " + attributeName + " in class " + res.getClass());
 			return;
 		}
-		Resource resource = model.getResource(res.getUri());
+
+		OWLProperty taf = field.getAnnotation(OWLProperty.class);
+		
 		Property property = model
-				.getProperty(model.expandPrefix(attributeName));
+				.getProperty(model.expandPrefix(taf.value()));
+
+		Resource resource = model.getResource(res.getUri());
 		resource.removeAll(property);
 		createAttribute(field, resource, res);
 		
@@ -585,13 +533,11 @@ public class Dualist {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
-		
 	}
 	
 	/*
 	 * Stores a POJO resource in the graph. If the resource doesn't exist, create it.
-	 *
+	 * NOTE: if the graph resource exists, the method deletes all attributes, also if there are attributes not represented by this class.
 	 */
 	public void upsert(GraphResource res) {
 		try {
@@ -905,7 +851,7 @@ public class Dualist {
 			
 			Resource s = model.getResource(model.expandPrefix(ref.uri));
 
-			if (objectCache.containsKey(s.toString())) {
+			if (objectCache.containsKey(s.toString()) && objectCache.get(s.toString()).getClass().equals(resourceClass)) {
 				resource = objectCache.get(s.toString());
 			} else {
 				resource = (GraphResource) Class
@@ -1736,6 +1682,35 @@ public class Dualist {
 	    }
 
 	    return fields;
+	}
+	
+	/*
+	 * Convert type of this resource. Potentially unsafe!
+	 */
+	public void convertType( String uri, String newType) {
+		try {
+
+			
+			Resource resource = null;
+			if( uri != null) {
+			// check if resource exists
+				resource = model.getResource(model.expandPrefix(uri));
+				
+				RDFNode typeRes = model.getResource(model.expandPrefix(newType));
+				
+				if( model.containsResource(resource)) {
+					model.removeAll(resource, RDF.type, (RDFNode) null);
+				}
+				model.add(resource, RDF.type, typeRes);    
+				
+				objectCache.remove(model.expandPrefix(uri));
+			}
+
+			
+		} catch (Exception e) {
+			log.error("Exception during modifying of a graph ", e);
+		}
+		
 	}
 	
 	public GraphResource convertNamespace(GraphResource res) {
