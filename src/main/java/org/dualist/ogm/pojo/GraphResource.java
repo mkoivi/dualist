@@ -102,6 +102,18 @@ public class GraphResource {
 		return types;
 	}
 
+	public boolean hasType( String htype) {
+		if( types == null ) 
+			types = new String[0];
+		for( String type: types) {
+			if( type.equals(htype)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	
 	public void setTypes(String[] types) {
 		this.types = types;
 	}

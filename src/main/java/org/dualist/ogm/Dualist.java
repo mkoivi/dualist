@@ -24,8 +24,10 @@ import java.util.UUID;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
+import org.apache.jena.ontology.OntClass;
 import org.apache.jena.ontology.OntModel;
 import org.apache.jena.ontology.OntProperty;
+import org.apache.jena.ontology.OntResource;
 import org.apache.jena.ontology.Restriction;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryExecution;
@@ -267,7 +269,7 @@ public class Dualist {
 				
 				res.setTypes(new String[] {resourceClass.toString()});
 				
-				if( !res.getClass().toString().contains( "org.dualist.ogm.pojo.GraphResource"))
+				if( !res.getClass().toString().contains( "GraphResource"))
 					this.putToCache(res);
 				
 				log.info("Dualist.create, created " + uri);
@@ -306,6 +308,15 @@ public class Dualist {
 		return null;
 	}
 
+	public URI createEmptyResource( URI type ) {
+		Resource resourceClass = model
+				.getResource(model.expandPrefix(type.toString()));
+		String uri = baseNs + resourceClass.getLocalName() + "."
+				+ UUID.randomUUID().toString();
+
+		Resource resource = model.createResource(uri, resourceClass);
+		return new URI( resource.getURI());
+	}
 	
 	private void createAttribute(Field f, Resource resource, GraphResource res) throws Exception {
 		if (f.isAnnotationPresent(OWLProperty.class)) {
@@ -902,6 +913,26 @@ public class Dualist {
 	}
 	
 	
+	public boolean isResourceTypeOf( URI resource, URI type) {
+		Resource r = model.getResource(model.expandPrefix(resource.uri));
+		Resource t = model.getResource(model.expandPrefix(type.uri));
+		return model.contains(r, RDF.type, t);
+	}
+
+	public boolean isSubClassOf( String child, String parent ) {
+		OntClass o = ((OntModel)model).getOntClass(child);
+		if(o== null )
+			return false;
+		Iterator<OntClass> it = o.listSuperClasses();
+		while(it.hasNext()) {
+	         OntClass par = it.next();
+			if( par.getURI().equals(parent)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
 	private void populateInverseProperties(GraphResource res) {
 		// TODO Auto-generated method stub
 		try {
@@ -1458,6 +1489,7 @@ public class Dualist {
 													.toUpperCase()
 											+ f.getName().substring(1),
 									Class.forName(f.getType().getName()));
+							System.out.println( "setter: " + setter.toString());
 							setter.invoke(pojoResource, instance); // invoke getXXX 
 						}
 						
