@@ -55,6 +55,7 @@ import org.apache.jena.rdf.model.SimpleSelector;
 import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.rdf.model.StmtIterator;
 import org.apache.jena.reasoner.Reasoner;
+import org.apache.jena.reasoner.ReasonerFactory;
 import org.apache.jena.reasoner.ReasonerRegistry;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
@@ -78,7 +79,11 @@ public class Dualist {
 	
 	HashMap<String, Class> defaultClasses = new HashMap<String, Class>();
 	
-	 protected OntModel model;
+	 protected InfModel model;
+
+	 //dataset for spatial data, contains indexes
+	 Dataset dataset;
+	 
 	 protected String baseNs;
 	 
 	 protected String queryPrefixMapping = null;
@@ -106,23 +111,24 @@ public class Dualist {
 	 */
 	public Dualist() {
 //		GeoSPARQLConfig.setupMemoryIndex();
+		
 		model = ModelFactory.createOntologyModel();
-
 	}
 	
 	public void initSpatialModel() {
 		Model smodel = GeoSPARQLOperations.convertGeoPredicates(model, false);
 		GeoSPARQLOperations.applyPrefixes(smodel);
 		GeoSPARQLConfig.setupMemoryIndex();
-		Dataset dataset = null;;
+		InfModel imodel =  GeoSPARQLOperations.prepare(smodel, ReasonerRegistry.getOWLMiniReasoner());
+		
 		try {
-			dataset = SpatialIndex.wrapModel(smodel);
+			dataset = SpatialIndex.wrapModel(imodel);
 		} catch (SpatialIndexException e) {
 			e.printStackTrace();
 		}
-		
-		model = ModelFactory.createOntologyModel(OntModelSpec.getDefaultSpec(ProfileRegistry.OWL_LITE_LANG), dataset.getDefaultModel());
-		
+
+		dataset.setDefaultModel(imodel);
+		model = imodel;
 	}
 	
 
@@ -1350,7 +1356,14 @@ public class Dualist {
 						pojoAttributeName = f.getName();
 						if( ta.hasRestrictions()) {
 							
-							OntProperty p = model.getOntProperty(predicate.getURI() );
+							StmtIterator iter = predicate.listProperties();
+							while (iter.hasNext()) {
+								Statement stmt = iter.nextStatement(); // get next statement
+								Resource s = stmt.getSubject(); // get the subject
+								Property p = stmt.getPredicate(); // get the predicate
+								RDFNode o = stmt.getObject(); // get the object
+							}
+	/*						OntProperty p = model.getOntProperty(predicate.getURI() );
 							Iterator<Restriction> i = p.listReferringRestrictions();
 							while (i.hasNext()) {
 							    Restriction r = i.next();
@@ -1362,7 +1375,7 @@ public class Dualist {
 							    else if( r.getPropertyValue( OWL2.maxQualifiedCardinality) != null ) {
 							    	ar = pojoResource.new AttributeRestriction(GraphResource.ATTRIBUTE_RESTRICTION.MAX_CARDINALITY, r.getPropertyValue( OWL2.maxQualifiedCardinality).asLiteral().getInt());						    
 							    }
-							}
+							}*/
 						}
 						
 						if (f.getType().toString()
@@ -1711,6 +1724,10 @@ public class Dualist {
 	
 	public Model getModel() {
 		return model;
+	}
+	
+	public Dataset getDataset() {
+		return dataset;
 	}
 
 	public Field getClassField( Class<?> type, String fieldName) throws Exception {
