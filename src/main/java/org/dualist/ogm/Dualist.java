@@ -79,7 +79,7 @@ public class Dualist {
 	
 	HashMap<String, Class> defaultClasses = new HashMap<String, Class>();
 	
-	 protected InfModel model;
+	 protected OntModel model;
 
 	 //dataset for spatial data, contains indexes
 	 Dataset dataset;
@@ -116,10 +116,18 @@ public class Dualist {
 	}
 	
 	public void initSpatialModel() {
-		Model smodel = GeoSPARQLOperations.convertGeoPredicates(model, false);
+		Model smodel = GeoSPARQLOperations.convertGeoPredicates(model, true);
 		GeoSPARQLOperations.applyPrefixes(smodel);
 		GeoSPARQLConfig.setupMemoryIndex();
-		InfModel imodel =  GeoSPARQLOperations.prepare(smodel, ReasonerRegistry.getOWLMiniReasoner());
+	//	InfModel imodel =  GeoSPARQLOperations.prepare(smodel, ReasonerRegistry.getOWLReasoner());
+		reasoner = ReasonerRegistry.getOWLReasoner();
+	      InputStream geosparqlSchemaInputStream = GeoSPARQLOperations.class.getClassLoader().getResourceAsStream("schema/geosparql_vocab_all_v1_0_1_updated.rdf");
+	       Model schema = ModelFactory.createDefaultModel();
+	        schema.read(geosparqlSchemaInputStream, null);
+	        //Apply the schema to the reasoner.
+	        reasoner = reasoner.bindSchema(schema);
+	        //Setup inference model.
+	        OntModel imodel = ModelFactory.createOntologyModel(OntModelSpec.OWL_LITE_MEM,model);
 		
 		try {
 			dataset = SpatialIndex.wrapModel(imodel);
@@ -671,13 +679,13 @@ public class Dualist {
 				Resource subject = stmt.getSubject(); // get the subject
 				// System.out.println(soln.toString());
 				
-
 				GraphResource resource;
-				if (objectCache.containsKey(subject.toString())) {
+				if (objectCache.containsKey(subject.toString()) && objectCache.get(subject.toString()).getClass().equals(resourceClass)) {
 					resource = objectCache.get(subject.toString());
 				} else {
 					resource = (GraphResource) Class
 							.forName(resourceClass.getName()).newInstance();
+
 					// Populate POJO and direct subclasses
 					populateFromGraph(resource, subject);
 					objectCache.put(subject.toString(), resource);
@@ -1109,7 +1117,7 @@ public class Dualist {
 			if (object instanceof Resource) {
 				// object is a resource
 				if (predicate.toString().endsWith("ns#type")) {
-					if( !object.toString().contains("owl") && !object.toString().contains("rdfs") && !object.toString().contains("rdf-schema") && !object.toString().contains("Class")) {
+					if( !object.toString().contains("owl") && !object.toString().contains("rdfs") && !object.toString().contains("rdf-schema") && !object.toString().contains("wgs84_pos") && !object.toString().contains("geosparql") && !object.toString().contains("Class") && ( object.toString().contains(":") || object.toString().contains("/")  )) {
 						String[] types = pojoResource.getTypes();
 						types = ArrayUtils.add(types, object.toString());
 						pojoResource.setTypes(types);
@@ -1363,7 +1371,7 @@ public class Dualist {
 								Property p = stmt.getPredicate(); // get the predicate
 								RDFNode o = stmt.getObject(); // get the object
 							}
-	/*						OntProperty p = model.getOntProperty(predicate.getURI() );
+							OntProperty p = model.getOntProperty(predicate.getURI() );
 							Iterator<Restriction> i = p.listReferringRestrictions();
 							while (i.hasNext()) {
 							    Restriction r = i.next();
@@ -1375,7 +1383,7 @@ public class Dualist {
 							    else if( r.getPropertyValue( OWL2.maxQualifiedCardinality) != null ) {
 							    	ar = pojoResource.new AttributeRestriction(GraphResource.ATTRIBUTE_RESTRICTION.MAX_CARDINALITY, r.getPropertyValue( OWL2.maxQualifiedCardinality).asLiteral().getInt());						    
 							    }
-							}*/
+							}
 						}
 						
 						if (f.getType().toString()
@@ -1526,7 +1534,7 @@ public class Dualist {
 													.toUpperCase()
 											+ f.getName().substring(1),
 									Class.forName(f.getType().getName()));
-							System.out.println( "setter: " + setter.toString());
+							
 							setter.invoke(pojoResource, instance); // invoke getXXX 
 						}
 						

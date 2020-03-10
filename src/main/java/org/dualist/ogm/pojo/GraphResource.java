@@ -9,6 +9,9 @@ public class GraphResource {
 	public String uri = null;
 	public String[] types;	
 	
+	// Warning: primary type is retrieved from Pojo @OWLClass annotation. Primary type will change depending on which class you use in instantiation
+	public String primaryType = null;
+	
 	public String graphUri = null;
 
 	boolean populateProperties = false;	
@@ -43,6 +46,21 @@ public class GraphResource {
 		this.graphUri = graphUri;
 	}
 	
+	public String getPrimaryType() {
+		return primaryType;
+	}
+
+	public void setPrimaryType(String primaryType) {
+		this.primaryType = primaryType;
+	}
+
+	public List<Attribute> getProperties() {
+		return properties;
+	}
+
+	public void setProperties(List<Attribute> properties) {
+		this.properties = properties;
+	}
 
 	public void copy(GraphResource copy){
 		copy.graphUri = this.graphUri;
