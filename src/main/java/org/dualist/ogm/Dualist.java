@@ -24,11 +24,18 @@ import java.util.UUID;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
+import org.apache.jena.geosparql.configuration.GeoSPARQLConfig;
+import org.apache.jena.geosparql.configuration.GeoSPARQLOperations;
+import org.apache.jena.geosparql.spatial.SpatialIndex;
+import org.apache.jena.geosparql.spatial.SpatialIndexException;
 import org.apache.jena.ontology.OntClass;
 import org.apache.jena.ontology.OntModel;
+import org.apache.jena.ontology.OntModelSpec;
 import org.apache.jena.ontology.OntProperty;
 import org.apache.jena.ontology.OntResource;
+import org.apache.jena.ontology.ProfileRegistry;
 import org.apache.jena.ontology.Restriction;
+import org.apache.jena.query.Dataset;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryExecution;
 import org.apache.jena.query.QueryExecutionFactory;
@@ -98,9 +105,26 @@ public class Dualist {
 	 * setter methods.
 	 */
 	public Dualist() {
+//		GeoSPARQLConfig.setupMemoryIndex();
 		model = ModelFactory.createOntologyModel();
 
 	}
+	
+	public void initSpatialModel() {
+		Model smodel = GeoSPARQLOperations.convertGeoPredicates(model, false);
+		GeoSPARQLOperations.applyPrefixes(smodel);
+		GeoSPARQLConfig.setupMemoryIndex();
+		Dataset dataset = null;;
+		try {
+			dataset = SpatialIndex.wrapModel(smodel);
+		} catch (SpatialIndexException e) {
+			e.printStackTrace();
+		}
+		
+		model = ModelFactory.createOntologyModel(OntModelSpec.getDefaultSpec(ProfileRegistry.OWL_LITE_LANG), dataset.getDefaultModel());
+		
+	}
+	
 
 	
 	public String getBaseNs() {
