@@ -1376,7 +1376,7 @@ public class Dualist {
 							Iterator<Restriction> i = p.listReferringRestrictions();
 							while (i.hasNext()) {
 							    Restriction r = i.next();
-							    System.out.println("Restriction on property " + predicate.getLocalName());
+							   
 							    if( r.getPropertyValue( OWL2.minQualifiedCardinality) != null ) {
 							    	ar = pojoResource.new AttributeRestriction(GraphResource.ATTRIBUTE_RESTRICTION.MIN_CARDINALITY, r.getPropertyValue( OWL2.minQualifiedCardinality).asLiteral().getInt());
 							    	
