@@ -118,8 +118,9 @@ public class Dualist {
 	public void initSpatialModel() {
 		Model smodel = GeoSPARQLOperations.convertGeoPredicates(model, true);
 		GeoSPARQLOperations.applyPrefixes(smodel);
-		GeoSPARQLConfig.setupMemoryIndex();
-	//	InfModel imodel =  GeoSPARQLOperations.prepare(smodel, ReasonerRegistry.getOWLReasoner());
+//		GeoSPARQLConfig.setupMemoryIndex();
+		GeoSPARQLConfig.setupNoIndex(false);
+		//	InfModel imodel =  GeoSPARQLOperations.prepare(smodel, ReasonerRegistry.getOWLReasoner());
 		reasoner = ReasonerRegistry.getOWLReasoner();
 	      InputStream geosparqlSchemaInputStream = GeoSPARQLOperations.class.getClassLoader().getResourceAsStream("schema/geosparql_vocab_all_v1_0_1_updated.rdf");
 	       Model schema = ModelFactory.createDefaultModel();
@@ -1738,6 +1739,9 @@ public class Dualist {
 		return dataset;
 	}
 
+	
+
+	
 	public Field getClassField( Class<?> type, String fieldName) throws Exception {
 		
 		Field[] fields = getAllClassFields( type);

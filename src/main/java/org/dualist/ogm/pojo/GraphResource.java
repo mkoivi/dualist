@@ -4,13 +4,13 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.dualist.ogm.annotations.OWLProperty;
+
 public class GraphResource {
 
 	public String uri = null;
 	public String[] types;	
 	
-	// Warning: primary type is retrieved from Pojo @OWLClass annotation. Primary type will change depending on which class you use in instantiation
-	public String primaryType = null;
 	
 	public String graphUri = null;
 
@@ -19,6 +19,14 @@ public class GraphResource {
 	boolean isReference = false;
 	
 	List<Attribute> properties = null;
+	
+	
+	@OWLProperty("geo:lat")
+	float lat;
+
+	@OWLProperty("geo:long")
+	float lon;
+
 	
 	public enum ATTRIBUTE_RESTRICTION {MAX_CARDINALITY, MIN_CARDINALITY};
 	
@@ -46,14 +54,6 @@ public class GraphResource {
 		this.graphUri = graphUri;
 	}
 	
-	public String getPrimaryType() {
-		return primaryType;
-	}
-
-	public void setPrimaryType(String primaryType) {
-		this.primaryType = primaryType;
-	}
-
 	public List<Attribute> getProperties() {
 		return properties;
 	}
@@ -180,6 +180,22 @@ public class GraphResource {
 			this.restriction = res;
 			this.value = val;
 		}
+	}
+
+	public float getLat() {
+		return lat;
+	}
+
+	public void setLat(float lat) {
+		this.lat = lat;
+	}
+
+	public float getLon() {
+		return lon;
+	}
+
+	public void setLon(float lon) {
+		this.lon = lon;
 	}
 	
 	
