@@ -505,6 +505,43 @@ public class Dualist {
 	}
 	
 	
+	public URI clone( URI resourceUri) {
+		Resource resource = model
+				.getResource(model.expandPrefix(resourceUri.toString()));
+		StmtIterator iter1 = model.listStatements(
+				new SimpleSelector(resource, RDF.type, (RDFNode) null));
+		
+			Statement stmt1 = iter1.nextStatement(); // get next statement
+
+			RDFNode object1 = stmt1.getObject(); // get the object
+			String type = object1.toString();		
+		iter1.close();
+		Resource resourceClass = model
+				.getResource(model.expandPrefix(type.toString()));
+		String newUri = baseNs + resourceClass.getLocalName() + "."
+				+ UUID.randomUUID().toString();
+
+		Resource newRes = model.createResource(newUri, resourceClass);
+		
+		StmtIterator iter = model.listStatements(
+				new SimpleSelector(resource, null, (RDFNode) null));
+		List<Statement> sts = new LinkedList<>();
+		while (iter.hasNext()) {
+			sts.add( iter.nextStatement()); // get next statement
+		}
+		iter.close();
+		for( Statement stmt:sts ) {
+			
+			Resource subject = stmt.getSubject(); // get the subject
+			Property predicate = stmt.getPredicate(); // get the predicate
+			RDFNode object = stmt.getObject(); // get the object
+	
+			model.add(newRes, predicate, object);
+		}
+		return new URI(newUri);
+		
+	}
+	
 	
 	/*
 	 * Modifies a POJO resource in the graph. Does not delete the resource, just modifies the fields represented in this class
@@ -927,6 +964,48 @@ public class Dualist {
 		}
 
 		return (T) resource;
+	}
+
+
+	/*
+	 * Instantiates a list of URIs to list of classes. Uses defaultClass to resolve resource's class if not found in cache.
+	 * 
+	 */
+	public <T extends GraphResource> List<T> instantiate(List<URI> uris) {
+		List<GraphResource> resPojoList = new LinkedList<>();
+		for( URI uri: uris) {
+			GraphResource res = objectCache.get(uri.toString());
+			if( res == null) {
+				res = get(uri, resolveDefaultClass( uri.toString()), false);
+			}
+			resPojoList.add(res);
+		}
+		
+		return (List<T>) resPojoList;
+	}
+	
+	private Class resolveDefaultClass(String uri) {
+		String type = null;
+		try {
+		Resource r = model.getResource(model.expandPrefix(uri));
+	
+		StmtIterator iter = model.listStatements(
+				new SimpleSelector(r, RDF.type, (RDFNode) null));
+		
+			Statement stmt = iter.nextStatement(); // get next statement
+			Resource subject = stmt.getSubject(); // get the subject
+			Property predicate = stmt.getPredicate(); // get the predicate
+			RDFNode object = stmt.getObject(); // get the object
+			type = object.toString();
+		}
+		catch( Exception e) {
+			e.printStackTrace();
+		}
+		Class defClass = GraphResource.class;	
+		if( type != null && defaultClasses.containsKey(type))
+			defClass = defaultClasses.get(type);
+			
+		return defClass;
 	}
 
 	protected void populateLiteralProperties(GraphResource pojoResource,
