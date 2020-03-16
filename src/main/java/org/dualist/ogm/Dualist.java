@@ -129,7 +129,7 @@ public class Dualist {
 	        reasoner = reasoner.bindSchema(schema);
 	        //Setup inference model.
 	        OntModel imodel = ModelFactory.createOntologyModel(OntModelSpec.OWL_LITE_MEM,model);
-		
+	   
 		try {
 			dataset = SpatialIndex.wrapModel(imodel);
 		} catch (SpatialIndexException e) {
@@ -399,50 +399,50 @@ public class Dualist {
 			if( value == null) {
 				log.debug("Method call returned null value: " + getter.getName());
 			}
-			else if (value instanceof String) {
+			else {
 				Property property = model
-						.getProperty(model.expandPrefix(taf.value()));
+					.getProperty(model.expandPrefix(taf.value()));
+			
+				createGraphAttribute( resource, property, value,taf.populateReferencedResource() );
+				log.debug( "Handled attribute " + f.getName() + ", graph property " + taf.value() +  ", value " + value.toString());
+			}
+		}
+	}	
+			
+	public void	createGraphAttribute( Resource resource, Property property, Object value, boolean populateReferencedResource) {			
+			if (value instanceof String) {
+		
 				Literal l = ResourceFactory.createTypedLiteral((String)value, XSDDatatype.XSDstring);
 				resource.addLiteral(property, l);
 			}
 			else if (value instanceof Integer) {
 	
-				Property property = model
-						.getProperty(model.expandPrefix(taf.value()));
 				Literal l = ResourceFactory.createTypedLiteral((Integer)value);
 				resource.addLiteral(property, l);
 			}
 			else if (value instanceof Float) {
-	
-				Property property = model
-						.getProperty(model.expandPrefix(taf.value()));
+
 				Literal l = ResourceFactory.createTypedLiteral((Float)value);
 				resource.addLiteral(property, l);
 			}
 			else if (value instanceof Double) {
-	
-				Property property = model
-						.getProperty(model.expandPrefix(taf.value()));
+
 				Literal l = ResourceFactory.createTypedLiteral((Double)value );
 				resource.addLiteral(property, l);
 			}
 			else if (value instanceof Boolean) {
 	
-				Property property = model
-						.getProperty(model.expandPrefix(taf.value()));
 				Literal l = ResourceFactory.createTypedLiteral((Boolean)value);
 				resource.addLiteral(property, l);
 			}
 			else if (value instanceof GraphResource) {
-				Property property = model
-						.getProperty(model.expandPrefix(taf.value()));
 	
 				Resource propResource;
-				if( taf.populateReferencedResource())
+				if( populateReferencedResource)
 					propResource = create(((GraphResource) value));
 				else {
 					if( ((GraphResource) value).getUri() == null) {
-						log.error("Object has a resource property with createReferencedResource=false, but the referenced URI is null! The resource must exist in graph! The resource with reference: " + res.uri);
+						log.error("Object has a resource property with createReferencedResource=false, but the referenced URI is null! The resource must exist in graph! The resource with reference: " + resource.toString());
 						return;
 					}
 					String refUri = this.getConvertedUri(((GraphResource) value).getUri());
@@ -455,8 +455,7 @@ public class Dualist {
 	
 				// if a List of URIs
 				if( ((List) value).size() > 0 &&  ((List) value).get(0) instanceof URI) {
-					Property property = model.getProperty(
-							model.expandPrefix(taf.value()));
+
 					for( URI luri : ((List<URI>)value)) {
 						// create just predicates to resource, referenced by URI
 						Resource propResource = model.getResource(this.getConvertedUri(luri.getUri()));
@@ -467,15 +466,12 @@ public class Dualist {
 				else {
 					for (GraphResource fr : (List<GraphResource>) value) {
 	
-						Property property = model.getProperty(
-								model.expandPrefix(taf.value()));
-	
 						Resource propResource;
-						if( taf.populateReferencedResource())
+						if(populateReferencedResource)
 							propResource = create(fr);
 						else {
 							if( fr.getUri() == null) {
-								log.error("Object has a resource property with createReferencedResource=false, but the referenced URI is null! The resource must exist in graph! The resource with reference: " + res.getUri());
+								log.error("Object has a resource property with createReferencedResource=false, but the referenced URI is null! The resource must exist in graph! The resource with reference: " + resource.toString());
 								continue;
 							}
 							log.debug("Don't create referenced resource, just make a reference: " + this.getConvertedUri(fr.getUri()));
@@ -488,21 +484,18 @@ public class Dualist {
 				}
 			}
 			else if (value instanceof URI) {
-	
-				Property property = model
-						.getProperty(model.expandPrefix(taf.value()));
 				Resource ref = model.getResource(this.getConvertedUri(((URI)value).getUri()));
 				resource.addProperty(property, ref);
 			}
 			 else {
 	
-				log.error("Error: unknown return value type for method " + getter.getName());
+				log.error("Error: unknown return value type for attribute " + property.getLocalName());
 			}
 	
-			if( value != null)	log.debug( "Handled attribute " + f.getName() + ", graph property " + taf.value() +  ", value " + value.toString());
+			
 	
 		}
-	}
+	
 	
 	
 	public URI clone( URI resourceUri) {
@@ -549,7 +542,7 @@ public class Dualist {
 	 */
 	public void modify(GraphResource res) {
 		try {
-			System.out.println("Dualist.modify " + res.getUri());
+			log.debug("Dualist.modify " + res.getUri());
 
 			String uri = res.getUri();
 			Resource resource = null;
@@ -623,6 +616,27 @@ public class Dualist {
 	}
 	
 	/*
+	 * Warning! This method updates attribute value in graph directly and does not update POJO objects. You should always reload related POJOs after calling this method.
+	 * Method removes resource pojo from cache.
+	 * 
+	 */
+	
+	public void modifyAttributeDirect(String resUri, String attribute, Object value)  throws ResourceNotExistException {
+		Resource resource = model.getResource(model.expandPrefix(resUri));
+		Property property = model.getProperty(model.expandPrefix(attribute));
+		
+		if( !model.containsResource(resource)) {
+			throw new ResourceNotExistException();
+		}
+
+		resource.removeAll(property);
+		if( value != null)
+			createGraphAttribute(resource, property, value,false);
+		
+		objectCache.remove(resUri);
+		
+	}
+	/*
 	 * Stores a POJO resource in the graph. If the resource doesn't exist, create it.
 	 * NOTE: if the graph resource exists, the method deletes all attributes, also if there are attributes not represented by this class.
 	 */
@@ -660,7 +674,7 @@ public class Dualist {
 	 * 
 	 */
 	public void delete(URI uri) {
-		System.out.println("Dualist.delete " + uri);
+		log.debug("Dualist.delete " + uri);
 		try {
 		
 			Resource resource = null;
@@ -715,7 +729,7 @@ public class Dualist {
 			while (iter.hasNext()) {
 				Statement stmt = iter.nextStatement(); // get next statement
 				Resource subject = stmt.getSubject(); // get the subject
-				// System.out.println(soln.toString());
+				// log.debug(soln.toString());
 				
 				GraphResource resource;
 				if (objectCache.containsKey(subject.toString()) && objectCache.get(subject.toString()).getClass().equals(resourceClass)) {
@@ -779,7 +793,7 @@ public class Dualist {
 
 				for (; results.hasNext();) {
 					QuerySolution soln = results.nextSolution();
-					// System.out.println(soln.toString());
+					// log.debug(soln.toString());
 					
 					Resource s = soln.getResource("result");
 				
@@ -832,7 +846,7 @@ public class Dualist {
 
 				for (; results.hasNext();) {
 					QuerySolution soln = results.nextSolution();
-					// System.out.println(soln.toString());
+					// log.debug(soln.toString());
 					
 					Resource s = soln.getResource("result");
 						
@@ -888,7 +902,7 @@ public class Dualist {
 
 				for (; results.hasNext();) {
 					QuerySolution sol = results.nextSolution();
-					// System.out.println(soln.toString());
+					// log.debug(soln.toString());
 					Resource s = sol.getResource("result");
 
 					if( resourceClass.equals(URI.class)) {
@@ -1267,7 +1281,7 @@ public class Dualist {
 			 * 
 			 * Property property = model.getProperty(ta.value());
 			 * resource.addProperty(property, value.toString());
-			 * System.out.println("added property " + ta.value() + " = " +
+			 * log.debug("added property " + ta.value() + " = " +
 			 * value.toString()); } }
 			 */
 
@@ -1293,7 +1307,7 @@ public class Dualist {
 
 							for (; results.hasNext();) {
 								QuerySolution soln = results.nextSolution();
-								// System.out.println(soln.toString());
+								// log.debug(soln.toString());
 								Resource s = soln.getResource("result");
 								String pojoClass = f.getGenericType()
 										.toString();
@@ -1653,7 +1667,7 @@ public class Dualist {
 				if (f.isAnnotationPresent(OWLProperty.class)) {
 
 					OWLProperty ta = f.getAnnotation(OWLProperty.class);
-					// System.out.println("OWL prop: " + ta.value() + ",
+					// log.debug("OWL prop: " + ta.value() + ",
 					// expanded " + model.expandPrefix(ta.value()) + ",
 					// predicate " + predicate.toString() );
 
@@ -1773,17 +1787,17 @@ public class Dualist {
 	 * pojoResource.getClass().getMethod(Constants.SET +
 	 * f.getName().substring(0, 1).toUpperCase() + f.getName().substring(1),
 	 * String.class ); // setter.invoke(pojoResource, object.toString()); //
-	 * invoke getXXX method // System.out.println("set property " + ta.value() +
+	 * invoke getXXX method // log.debug("set property " + ta.value() +
 	 * " = " + object.toString()); } } }
 	 * 
 	 * 
-	 * // System.out.println(soln.toString());
+	 * // log.debug(soln.toString());
 	 * 
 	 * 
 	 * // RDFNode s = soln.get("s") ; // Get a result variable by name. //
 	 * Resource p = soln.getResource("p") ; // Get a result variable - must be a
 	 * resource // Literal o = soln.getLiteral("o") ; // Get a result variable -
-	 * must be a literal } } System.out.println("Query time: " + (new
+	 * must be a literal } } log.debug("Query time: " + (new
 	 * Date().getTime() - startTime) + " ms"); }
 	 * 
 	 */
@@ -1988,7 +2002,7 @@ public class Dualist {
 	
 	public void dumpCacheObjects() {
 		for( String uri: objectCache.keySet()) {
-			System.out.println( uri + ": " + objectCache.get(uri).getUri());
+			log.debug( uri + ": " + objectCache.get(uri).getUri());
 		}
 	}
 	
