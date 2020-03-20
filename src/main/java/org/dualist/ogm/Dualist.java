@@ -630,6 +630,7 @@ public class Dualist {
 		}
 
 		resource.removeAll(property);
+		model.removeAll(resource,property, (RDFNode) null);
 		if( value != null)
 			createGraphAttribute(resource, property, value,false);
 		
