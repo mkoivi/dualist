@@ -34,8 +34,8 @@ public class GraphResource {
 	public GraphResource() {
 	}
 
-	public GraphResource(String uri) {
-		this.uri = uri;
+	public GraphResource(String type) {
+		this.types = new String[] {type};
 	}
 
 	public String getUri() {

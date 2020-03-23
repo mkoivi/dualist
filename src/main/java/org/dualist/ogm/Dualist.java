@@ -118,8 +118,8 @@ public class Dualist {
 	public void initSpatialModel() {
 		Model smodel = GeoSPARQLOperations.convertGeoPredicates(model, true);
 		GeoSPARQLOperations.applyPrefixes(smodel);
-//		GeoSPARQLConfig.setupMemoryIndex();
-		GeoSPARQLConfig.setupNoIndex(false);
+		GeoSPARQLConfig.setupMemoryIndex();
+//		GeoSPARQLConfig.setupNoIndex(false);
 		//	InfModel imodel =  GeoSPARQLOperations.prepare(smodel, ReasonerRegistry.getOWLReasoner());
 		reasoner = ReasonerRegistry.getOWLReasoner();
 	      InputStream geosparqlSchemaInputStream = GeoSPARQLOperations.class.getClassLoader().getResourceAsStream("schema/geosparql_vocab_all_v1_0_1_updated.rdf");
@@ -281,11 +281,18 @@ public class Dualist {
 					return null;
 				}
 				
-				OWLClass ta = c.getAnnotation(OWLClass.class);
+				// if resource type is not defined in pojo types attribute, get the type from @OWLClass annotation
+				if( res.types == null || res.types.length == 0) {
+					OWLClass ta = c.getAnnotation(OWLClass.class);
 	
-				// Get resource class 
-				resourceClass = model
-						.getResource(model.expandPrefix(ta.value()));
+					// Get resource class 
+					resourceClass = model
+							.getResource(model.expandPrefix(ta.value()));
+				}
+				else {
+					resourceClass = model
+							.getResource(model.expandPrefix(res.types[0]));
+				}
 			
 			}
 			String uri = res.getUri();
@@ -587,7 +594,7 @@ public class Dualist {
 	 * attributeName is the Java class attribute name; graph attribute name is retrieved from OWLPropery annotation!
 	 * Does not work with alternative OWLProperty attributes (value2, value3....)
 	 */
-	public void modifyAttribute(GraphResource res, String attributeName) throws ResourceNotExistException {
+	public void modifyAttribute(GraphResource res, String attributeName)  {
 		try {
 			
 		Field field = getClassField(res.getClass(),attributeName);
@@ -808,6 +815,56 @@ public class Dualist {
 
 		return resPojoList;
 	}
+	
+	
+	/*
+	 * 	 * A direct sparql query to retrieve results. 
+	 * 
+	 * NOTE: resource variable containing resource URIs is ?result
+	 * 
+	 */
+	public <T extends GraphResource> List<T> query(Class resourceClass, String sparqlQuery) {
+		List<GraphResource> resPojoList = new LinkedList<>();
+		try {
+			if(!sparqlQuery.contains("result")) {
+				log.error("Sparql query does not contain 'result' variable! Result variable must contain URI(s) of the resources to be returned from the query");
+				return null;
+			}
+		
+				String sparqlQueryMapped = this.getQueryPrefixMapping() + sparqlQuery;
+
+				Query query = QueryFactory.create(sparqlQueryMapped);
+				try (QueryExecution qexec = QueryExecutionFactory.create(query,
+						model)) {
+					ResultSet results = qexec.execSelect();
+
+					for (; results.hasNext();) {
+						QuerySolution soln = results.nextSolution();
+						Resource s = soln.getResource("result");
+						
+						GraphResource resource;
+						if (objectCache.containsKey(s.toString()) && objectCache.get(s.toString()).getClass().equals(resourceClass)) {
+							resource = objectCache.get(s.toString());
+						} else {
+							resource = (GraphResource) Class
+									.forName(resourceClass.getName()).newInstance();
+		
+							// Populate POJO and direct subclasses
+							populateFromGraph(resource, s);
+							objectCache.put(s.toString(), resource);
+						}
+				resPojoList.add(resource);
+			}
+		} catch (Exception e) {
+			log.error("Exception during querying of a graph ", e);
+		}
+		} catch (Exception e) {
+			log.error("Exception during querying of a graph ", e);
+		}
+				
+		return (List<T>) resPojoList;
+	}
+	
 	
 	
 	/*
@@ -1549,7 +1606,7 @@ public class Dualist {
 												null);
 								List list = (List) (getter.invoke(pojoResource)); // invoke getXXX
 								if (list == null) {
-									list = new LinkedList();
+									list = new LinkedList<>();
 								}
 								list.add(uri);
 								Method setter;
