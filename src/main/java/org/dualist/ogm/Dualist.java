@@ -66,9 +66,17 @@ import org.apache.log4j.Logger;
 
 import org.dualist.ogm.annotations.OWLClass;
 import org.dualist.ogm.annotations.OWLProperty;
+import org.dualist.ogm.event.LocationUpdateListener;
 import org.dualist.ogm.pojo.GraphResource;
 import org.dualist.ogm.pojo.GraphResource.AttributeRestriction;
 import org.dualist.ogm.pojo.URI;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.index.ItemVisitor;
+import org.locationtech.jts.index.quadtree.Quadtree;
 
 public class Dualist {
 
@@ -76,6 +84,16 @@ public class Dualist {
 			.getLogger(Dualist.class.getName());
 
 	HashMap<String, GraphResource> objectCache = new HashMap<>();
+	
+	
+	Quadtree t = new Quadtree();
+    GeometryFactory gf = new GeometryFactory();
+    
+    HashMap<String, Geometry> resGeometries = new HashMap<>();
+    
+    
+	List<LocationUpdateListener> luListeners = new LinkedList<>();
+	
 	
 	HashMap<String, Class> defaultClasses = new HashMap<String, Class>();
 	
@@ -113,6 +131,9 @@ public class Dualist {
 //		GeoSPARQLConfig.setupMemoryIndex();
 		
 		model = ModelFactory.createOntologyModel();
+		
+	
+		
 	}
 	
 	public void initSpatialModel() {
@@ -132,15 +153,25 @@ public class Dualist {
 	   
 		try {
 			dataset = SpatialIndex.wrapModel(imodel);
+	//		dataset.setDefaultModel(imodel);
+			model = imodel;
+	//		SpatialIndex.buildSpatialIndex(dataset);
+		
 		} catch (SpatialIndexException e) {
 			e.printStackTrace();
 		}
-
-		dataset.setDefaultModel(imodel);
-		model = imodel;
+		
 	}
 	
-
+	public void addLocationUpdateListener( LocationUpdateListener lu) {
+		luListeners.add(lu);
+	}
+	
+	public void sendLocationUpdateEvent( URI uri ) {
+		for( LocationUpdateListener lu: luListeners) {
+			lu.locationUpdated(uri);
+		}
+	}
 	
 	public String getBaseNs() {
 		return baseNs;
@@ -320,6 +351,8 @@ public class Dualist {
 				
 				log.info("Dualist.create, created " + uri);
 				
+	//			this.sendLocationUpdateEvent(new URI(res.getUri()));
+				
 			} else {
 				log.info("Graph already contains resource with URI " + uri);
 				return resource;
@@ -346,6 +379,11 @@ public class Dualist {
 				createAttribute( f, resource, res);
 			}
 			log.debug("Created resource having URI " + resource.getURI() );
+			
+			if( res.getLat() > 2 && res.getLon() > 2) {
+				addLocation(res);
+			}
+			
 			return resource;
 
 		} catch (Exception e) {
@@ -354,6 +392,51 @@ public class Dualist {
 		return null;
 	}
 
+	public void addLocation(GraphResource res) {
+		Point pt;
+		pt = gf.createPoint(new Coordinate(res.getLon(), res.getLat()));
+		pt.setUserData(res.getUri());
+	    t.insert(pt.getEnvelopeInternal(), pt);
+	    resGeometries.put(res.getUri(), pt);
+	}	
+	
+	public void updateLocation(GraphResource res) {
+		Point pt = (Point)resGeometries.get(res.getUri());
+		if( pt != null)		
+			t.remove(pt.getEnvelopeInternal(), pt);
+		
+		addLocation(res);
+		
+	}	
+	
+	public List<String> queryByLocation(  double minLon, double maxLon, double minLat, double maxLat ) {
+
+		List<String> res = new LinkedList<>();
+		
+		List<Point> ps = new LinkedList<>();
+		Envelope e = new Envelope( minLon, maxLon, minLat, maxLat);
+		t.query(e, new QuadPointVisitor( minLat, minLon, maxLat,maxLon, ps));
+	        for(Point p:ps) {
+	        	res.add((String)p.getUserData());
+	        }
+	    return res;
+	}
+	
+	
+	/*
+	 * Returns points, containing URI as userData
+	 */
+	public List<Point> queryPointsByLocation(  double minLon, double maxLon, double minLat, double maxLat ) {
+		List<Point> ps = new LinkedList<>();
+		Envelope e = new Envelope( minLon, maxLon, minLat, maxLat);
+		t.query(e, new QuadPointVisitor( minLat, minLon, maxLat,maxLon, ps));
+	    return ps;
+	}
+	
+	
+	
+	
+	
 	public URI createEmptyResource( URI type ) {
 		Resource resourceClass = model
 				.getResource(model.expandPrefix(type.toString()));
@@ -587,7 +670,7 @@ public class Dualist {
 	}
 
 	
-	
+		
 	/*
 	 * Updates an attribute of a pojo in the graph. 
 	 * 
@@ -609,8 +692,14 @@ public class Dualist {
 				.getProperty(model.expandPrefix(taf.value()));
 
 		Resource resource = model.getResource(res.getUri());
+
+		
 		resource.removeAll(property);
 		createAttribute(field, resource, res);
+		
+		if( property.getLocalName().equals("lat") || property.getLocalName().equals("long") ) 
+			log.error("Do not update location with modifyAttribute method! Use updateLocation instead");
+
 		
 		} catch (NoSuchFieldException e) {
 			log.error("No field " + attributeName + " in class " + res.getClass());
@@ -622,18 +711,42 @@ public class Dualist {
 		}
 	}
 	
+	
+	/*
+	 * Updates an attribute of a pojo in the graph. 
+	 * 
+	 * attributeName is the Java class attribute name; graph attribute name is retrieved from OWLPropery annotation!
+	 * Does not work with alternative OWLProperty attributes (value2, value3....)
+	 */
+	public void updateLocation(GraphResource res, float lat, float lon)  {
+		try {
+			
+		this.modifyAttributeDirect(res.getUri(), "geo:lat", lat);
+		this.modifyAttributeDirect(res.getUri(), "geo:long", lon);
+		res.setLat(lat);
+		res.setLon(lon);
+	//		this.sendLocationUpdateEvent(new URI(res.getUri()));
+		updateLocation( res);
+		}catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	
+	
 	/*
 	 * Warning! This method updates attribute value in graph directly and does not update POJO objects. You should always reload related POJOs after calling this method.
 	 * Method removes resource pojo from cache.
 	 * 
 	 */
 	
-	public void modifyAttributeDirect(String resUri, String attribute, Object value)  throws ResourceNotExistException {
+	public void modifyAttributeDirect(String resUri, String attribute, Object value)  {
 		Resource resource = model.getResource(model.expandPrefix(resUri));
 		Property property = model.getProperty(model.expandPrefix(attribute));
 		
 		if( !model.containsResource(resource)) {
-			throw new ResourceNotExistException();
+			log.error("Resource not found in modifyAttributeDirect: " + resUri);
 		}
 
 		resource.removeAll(property);
@@ -642,6 +755,10 @@ public class Dualist {
 			createGraphAttribute(resource, property, value,false);
 		
 		objectCache.remove(resUri);
+		
+		if( property.getLocalName().equals("lat") || property.getLocalName().equals("long") )
+			this.sendLocationUpdateEvent(new URI(resUri));
+		
 		
 	}
 	/*
@@ -663,6 +780,9 @@ public class Dualist {
 			}
 
 			create( res );
+			
+			this.sendLocationUpdateEvent(new URI(res.getUri()));
+			
 		} catch (Exception e) {
 			log.error("Exception during modifying of a graph ", e);
 		}
@@ -701,6 +821,8 @@ public class Dualist {
 			model.removeAll(null, null, resource);
 
 			objectCache.remove(uri.toString());
+			
+			this.sendLocationUpdateEvent(uri);
 
 		} catch (Exception e) {
 			log.error("Exception during deleting of a graph ", e);
@@ -2064,6 +2186,34 @@ public class Dualist {
 		}
 	}
 	
+	
+	
+	public class QuadPointVisitor implements ItemVisitor {
+
+		public List<Point> result;
+		
+		double minLat; 
+		double minLon;
+		double maxLat;
+		double maxLon;		
+		public QuadPointVisitor( double minLat, double minLon, double maxLat, double maxLon,  List<Point> result) {
+			this.minLat = minLat;
+			this.minLon = minLon;
+			this.maxLat = maxLat;
+			this.maxLon = maxLon;
+			this.result = result;
+		}
+		
+		@Override
+		public void visitItem(Object item) {
+			Point p = (Point)item;
+			if(p.getX() > minLon && p.getX() < maxLon && p.getY() > minLat && p.getY() < maxLat) {
+				result.add(p);
+			}
+				
+		}
+		
+	}
 	
 	
 }
