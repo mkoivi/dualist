@@ -74,9 +74,13 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.Polygonal;
 import org.locationtech.jts.index.ItemVisitor;
 import org.locationtech.jts.index.quadtree.Quadtree;
+
+
 
 public class Dualist {
 
@@ -91,9 +95,6 @@ public class Dualist {
     
     HashMap<String, Geometry> resGeometries = new HashMap<>();
     
-    
-	List<LocationUpdateListener> luListeners = new LinkedList<>();
-	
 	
 	HashMap<String, Class> defaultClasses = new HashMap<String, Class>();
 	
@@ -163,16 +164,7 @@ public class Dualist {
 		
 	}
 	
-	public void addLocationUpdateListener( LocationUpdateListener lu) {
-		luListeners.add(lu);
-	}
-	
-	public void sendLocationUpdateEvent( URI uri ) {
-		for( LocationUpdateListener lu: luListeners) {
-			lu.locationUpdated(uri);
-		}
-	}
-	
+
 	public String getBaseNs() {
 		return baseNs;
 	}
@@ -381,7 +373,7 @@ public class Dualist {
 			log.debug("Created resource having URI " + resource.getURI() );
 			
 			if( res.getLat() > 2 && res.getLon() > 2) {
-				addLocation(res);
+				updateLocation(res);
 			}
 			
 			return resource;
@@ -392,30 +384,25 @@ public class Dualist {
 		return null;
 	}
 
-	private void addLocation(GraphResource res) {
-		Point pt;
-		pt = gf.createPoint(new Coordinate(res.getLon(), res.getLat()));
-		pt.setUserData(res.getUri());
-	    t.insert(pt.getEnvelopeInternal(), pt);
-	    resGeometries.put(res.getUri(), pt);
-	}	
 	
 	private void updateLocation(GraphResource res) {
 		Point pt = (Point)resGeometries.get(res.getUri());
 		if( pt != null)		
 			t.remove(pt.getEnvelopeInternal(), pt);
-		
-		addLocation(res);
+		pt = gf.createPoint(new Coordinate(res.getLon(), res.getLat()));
+		pt.setUserData(res.getUri());
+	    t.insert(pt.getEnvelopeInternal(), pt);
+	    resGeometries.put(res.getUri(), pt);
 		
 	}	
 	
-	public List<String> queryByLocation(  double minLon, double maxLon, double minLat, double maxLat ) {
+	public List<String> queryByLocation( String callerUri, double minLon, double maxLon, double minLat, double maxLat ) {
 
 		List<String> res = new LinkedList<>();
 		
 		List<Point> ps = new LinkedList<>();
 		Envelope e = new Envelope( minLon, maxLon, minLat, maxLat);
-		t.query(e, new QuadPointVisitor( minLat, minLon, maxLat,maxLon, ps));
+		t.query(e, new QuadPointVisitor( minLat, minLon, maxLat,maxLon, ps, callerUri));
 	        for(Point p:ps) {
 	        	res.add((String)p.getUserData());
 	        }
@@ -426,14 +413,26 @@ public class Dualist {
 	/*
 	 * Returns points, containing URI as userData
 	 */
-	public List<Point> queryPointsByLocation(  double minLon, double maxLon, double minLat, double maxLat ) {
+	public List<Point> queryPointsByLocation( String callerUri, double minLon, double maxLon, double minLat, double maxLat ) {
 		List<Point> ps = new LinkedList<>();
 		Envelope e = new Envelope( minLon, maxLon, minLat, maxLat);
-		t.query(e, new QuadPointVisitor( minLat, minLon, maxLat,maxLon, ps));
+		t.query(e, new QuadPointVisitor( minLat, minLon, maxLat,maxLon, ps, callerUri));
 	    return ps;
 	}
 	
-	
+	/*
+	 * Returns points, containing URI as userData
+	 */
+	public List<Point> queryPointsByPath( String callerUri, float sLon, float tLon, float sLat, float tLat, float maxDist) {
+
+		LineString path = gf.createLineString(new Coordinate[] {new Coordinate(sLon,sLat), new Coordinate(tLon,tLat)});
+
+		List<Point> ps = new LinkedList<>();
+		Envelope e = new Envelope( sLon, tLon, sLat, tLat);
+		
+		t.query(e, new QuadPointPathVisitor( ps,path, maxDist, callerUri));
+	    return ps;
+	}
 	
 	
 	
@@ -755,9 +754,7 @@ public class Dualist {
 			createGraphAttribute(resource, property, value,false);
 		
 		objectCache.remove(resUri);
-		
-		if( property.getLocalName().equals("lat") || property.getLocalName().equals("long") )
-			this.sendLocationUpdateEvent(new URI(resUri));
+
 		
 		
 	}
@@ -780,9 +777,8 @@ public class Dualist {
 			}
 
 			create( res );
-			
-			this.sendLocationUpdateEvent(new URI(res.getUri()));
-			
+		
+	
 		} catch (Exception e) {
 			log.error("Exception during modifying of a graph ", e);
 		}
@@ -821,8 +817,7 @@ public class Dualist {
 			model.removeAll(null, null, resource);
 
 			objectCache.remove(uri.toString());
-			
-			this.sendLocationUpdateEvent(uri);
+
 
 		} catch (Exception e) {
 			log.error("Exception during deleting of a graph ", e);
@@ -2195,25 +2190,55 @@ public class Dualist {
 		double minLat; 
 		double minLon;
 		double maxLat;
-		double maxLon;		
-		public QuadPointVisitor( double minLat, double minLon, double maxLat, double maxLon,  List<Point> result) {
+		double maxLon;
+		String callerUri;
+		public QuadPointVisitor( double minLat, double minLon, double maxLat, double maxLon,  List<Point> result, String callerUri) {
 			this.minLat = minLat;
 			this.minLon = minLon;
 			this.maxLat = maxLat;
 			this.maxLon = maxLon;
 			this.result = result;
+			this.callerUri = callerUri;
 		}
 		
 		@Override
 		public void visitItem(Object item) {
 			Point p = (Point)item;
-			if(p.getX() > minLon && p.getX() < maxLon && p.getY() > minLat && p.getY() < maxLat) {
+			if(p.getX() > minLon && p.getX() < maxLon && p.getY() > minLat && p.getY() < maxLat && !((String)(p.getUserData())).equals(callerUri)) {
 				result.add(p);
 			}
 				
 		}
 		
 	}
+	
+	
+	public class QuadPointPathVisitor implements ItemVisitor {
+
+		public List<Point> result;
+		LineString path;
+		String callerUri;
+		float maxDist;
+		
+		public QuadPointPathVisitor( List<Point> result, LineString path, float maxDist, String callerUri) {
+			this.path = path;
+			this.result = result;
+			this.maxDist = maxDist;
+			this.callerUri = callerUri;
+		}
+		
+		@Override
+		public void visitItem(Object item) {
+			Point p = (Point)item;
+			if( path.distance(p) < maxDist && !((String)(p.getUserData())).equals(callerUri)) {
+				result.add(p);
+			}
+				
+		}
+		
+	}
+	
+	
 	
 	
 }
