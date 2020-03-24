@@ -42,6 +42,10 @@ public class GraphResource {
 		return uri;
 	}
 
+	public URI getUriObj() {
+		return new URI(uri);
+	}
+	
 	public void setUri(String uri) {
 		this.uri = uri;
 	}

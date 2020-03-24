@@ -392,7 +392,7 @@ public class Dualist {
 		return null;
 	}
 
-	public void addLocation(GraphResource res) {
+	private void addLocation(GraphResource res) {
 		Point pt;
 		pt = gf.createPoint(new Coordinate(res.getLon(), res.getLat()));
 		pt.setUserData(res.getUri());
@@ -400,7 +400,7 @@ public class Dualist {
 	    resGeometries.put(res.getUri(), pt);
 	}	
 	
-	public void updateLocation(GraphResource res) {
+	private void updateLocation(GraphResource res) {
 		Point pt = (Point)resGeometries.get(res.getUri());
 		if( pt != null)		
 			t.remove(pt.getEnvelopeInternal(), pt);
