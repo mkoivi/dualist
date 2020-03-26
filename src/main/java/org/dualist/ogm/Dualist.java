@@ -174,7 +174,7 @@ public class Dualist {
 	 *	 * 
 	 */
 	public void registerDefaultClass(String owlClassUri, Class className) {
-		defaultClasses.put(owlClassUri, className);
+		defaultClasses.put(model.expandPrefix(owlClassUri), className);
 	}
 
 	public void setBaseNs(String baseNs) {
@@ -1102,6 +1102,13 @@ public class Dualist {
 	/* 
 	 * Get a POJO by URI
 	 */
+	public <T extends GraphResource> T get(URI uri, Class resourceClass) {
+		return get(uri, resourceClass, false);
+	}
+	
+	/* 
+	 * Get a POJO by URI
+	 */
 	public <T extends GraphResource> T get(String uri, Class resourceClass) {
 		return get(new URI(uri), resourceClass, false);
 	}
@@ -1174,11 +1181,11 @@ public class Dualist {
 	}
 	
 	private Class resolveDefaultClass(String uri) {
-		String type = null;
-		try {
-		Resource r = model.getResource(model.expandPrefix(uri));
-	
-		StmtIterator iter = model.listStatements(
+	//	String type = null;
+		//try {
+		OntResource r = model.getOntResource(model.expandPrefix(uri));
+		Resource type = r.getRDFType(true);
+	/*	StmtIterator iter = model.listStatements(
 				new SimpleSelector(r, RDF.type, (RDFNode) null));
 		
 			Statement stmt = iter.nextStatement(); // get next statement
@@ -1189,10 +1196,10 @@ public class Dualist {
 		}
 		catch( Exception e) {
 			e.printStackTrace();
-		}
+		}*/
 		Class defClass = GraphResource.class;	
-		if( type != null && defaultClasses.containsKey(type))
-			defClass = defaultClasses.get(type);
+		if( type != null && defaultClasses.containsKey(type.getURI()))
+			defClass = defaultClasses.get(type.getURI());
 			
 		return defClass;
 	}
