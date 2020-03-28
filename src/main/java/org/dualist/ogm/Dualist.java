@@ -325,6 +325,10 @@ public class Dualist {
 				resource = model.getResource(uri);
 				
 			}
+			
+			String name = "";
+	//		if( res.get)
+			
 			// resource does not exist.create new
 			if (resource == null || !model.contains(resource, null)) {
 				if (uri == null) { // if URI is not set, create a new URI
@@ -1224,6 +1228,7 @@ public class Dualist {
 				
 			}
 		}
+		iter.close();
 	}
 	
 	
@@ -2166,6 +2171,12 @@ public class Dualist {
 	}
 
 	
+	
+	public GraphResource getFromCache( String uri) {
+		return objectCache.get(uri);
+	}
+	
+	
 	/* Put 
 	 * 
 	 */
@@ -2240,12 +2251,56 @@ public class Dualist {
 			if( path.distance(p) < maxDist && !((String)(p.getUserData())).equals(callerUri)) {
 				result.add(p);
 			}
-				
+			
 		}
 		
+	
 	}
 	
 	
+	public List<GraphResource.Attribute> dumpResourceAttributes(String uri) {
+		List<GraphResource.Attribute> props = new LinkedList<>();
+		if( !this.containsResource(uri) ) {
+			log.debug( "Resource not found in graph" );
+			return null;
+		}
+
+		Resource s = model.getResource(model.expandPrefix(uri));
+		StmtIterator iter = model.listStatements( new SimpleSelector(s, null, (RDFNode) null));
+		GraphResource res = new GraphResource();
+		while (iter.hasNext()) {
+			Statement stmt = iter.nextStatement(); // get next statement
+			Resource subject = stmt.getSubject(); // get the subject
+			Property predicate = stmt.getPredicate(); // get the predicate
+			RDFNode object = stmt.getObject(); // get the object
+			
+			props.add(res.new Attribute( predicate.getLocalName(), predicate.getURI(), object.toString()));
+		}
+		iter.close();
+		return props;
+	}
+	
+	public List<GraphResource.Attribute> dumpResourceIncomingAttributes(String uri) {
+		List<GraphResource.Attribute> props = new LinkedList<>();
+		if( !this.containsResource(uri) ) {
+			log.debug( "Resource not found in graph" );
+			return null;
+		}
+
+		Resource s = model.getResource(model.expandPrefix(uri));
+		StmtIterator iter = model.listStatements( new SimpleSelector(null, null, s));
+		GraphResource res = new GraphResource();
+		while (iter.hasNext()) {
+			Statement stmt = iter.nextStatement(); // get next statement
+			Resource subject = stmt.getSubject(); // get the subject
+			Property predicate = stmt.getPredicate(); // get the predicate
+	//		RDFNode object = stmt.getObject(); // get the object
+			
+			props.add(res.new Attribute( predicate.getLocalName(), predicate.getURI(), subject.toString()));
+		}
+		iter.close();
+		return props;
+	}
 	
 	
 }

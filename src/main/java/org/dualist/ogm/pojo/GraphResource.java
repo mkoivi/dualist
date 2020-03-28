@@ -18,13 +18,16 @@ public class GraphResource {
 	
 	boolean isReference = false;
 	
+	@OWLProperty("http://8scale.com/wargame#name")
+	public String name;
+	
 	List<Attribute> properties = null;
 	
 	
-	@OWLProperty("geo:lat")
+	@OWLProperty("http://www.w3.org/2003/01/geo/wgs84_pos#lat")
 	float lat;
 
-	@OWLProperty("geo:long")
+	@OWLProperty("http://www.w3.org/2003/01/geo/wgs84_pos#long")
 	float lon;
 
 	
@@ -200,6 +203,14 @@ public class GraphResource {
 
 	public void setLon(float lon) {
 		this.lon = lon;
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
 	}
 	
 	
