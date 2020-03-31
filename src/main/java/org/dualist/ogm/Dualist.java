@@ -427,14 +427,14 @@ public class Dualist {
 	/*
 	 * Returns points, containing URI as userData
 	 */
-	public List<Point> queryPointsByPath( String callerUri, float sLon, float tLon, float sLat, float tLat, float maxDist) {
+	public List<Point> queryPointsByPath( String callerUri, String callerOrg, float sLon, float tLon, float sLat, float tLat, float maxDist) {
 
 		LineString path = gf.createLineString(new Coordinate[] {new Coordinate(sLon,sLat), new Coordinate(tLon,tLat)});
 
 		List<Point> ps = new LinkedList<>();
 		Envelope e = new Envelope( sLon, tLon, sLat, tLat);
 		
-		t.query(e, new QuadPointPathVisitor( ps,path, maxDist, callerUri));
+		t.query(e, new QuadPointPathVisitor( ps,path, maxDist, callerUri, callerOrg));
 	    return ps;
 	}
 	
@@ -686,7 +686,8 @@ public class Dualist {
 		Field field = getClassField(res.getClass(),attributeName);
 		if( field==null) {
 			log.error("No field " + attributeName + " in class " + res.getClass());
-			return;
+			throw new RuntimeException("No field " + attributeName + " in class " + res.getClass());
+		
 		}
 
 		OWLProperty taf = field.getAnnotation(OWLProperty.class);
@@ -724,8 +725,8 @@ public class Dualist {
 	public void updateLocation(GraphResource res, float lat, float lon)  {
 		try {
 			
-		this.modifyAttributeDirect(res.getUri(), "geo:lat", lat);
-		this.modifyAttributeDirect(res.getUri(), "geo:long", lon);
+		this.modifyAttributeDirect(res.getUri(), "http://www.w3.org/2003/01/geo/wgs84_pos#lat", lat);
+		this.modifyAttributeDirect(res.getUri(), "http://www.w3.org/2003/01/geo/wgs84_pos#long", lon);
 		res.setLat(lat);
 		res.setLon(lon);
 	//		this.sendLocationUpdateEvent(new URI(res.getUri()));
@@ -1171,6 +1172,21 @@ public class Dualist {
 	 * Instantiates a list of URIs to list of classes. Uses defaultClass to resolve resource's class if not found in cache.
 	 * 
 	 */
+	public <T extends GraphResource> List<T> instantiate(List<URI> uris, Class resourceClass) {
+		List<GraphResource> resPojoList = new LinkedList<>();
+		for( URI uri: uris) {
+			GraphResource res = get(uri, resourceClass, false);
+		
+			resPojoList.add(res);
+		}
+		
+		return (List<T>) resPojoList;
+	}
+	
+	/*
+	 * Instantiates a list of URIs to list of classes. Uses defaultClass to resolve resource's class if not found in cache.
+	 * 
+	 */
 	public <T extends GraphResource> List<T> instantiate(List<URI> uris) {
 		List<GraphResource> resPojoList = new LinkedList<>();
 		for( URI uri: uris) {
@@ -1183,6 +1199,8 @@ public class Dualist {
 		
 		return (List<T>) resPojoList;
 	}
+	
+	
 	
 	private Class resolveDefaultClass(String uri) {
 	//	String type = null;
@@ -1239,13 +1257,13 @@ public class Dualist {
 	}
 
 	public boolean isSubClassOf( String child, String parent ) {
-		OntClass o = ((OntModel)model).getOntClass(child);
+		OntClass o = ((OntModel)model).getOntClass(model.expandPrefix(child));
 		if(o== null )
 			return false;
 		Iterator<OntClass> it = o.listSuperClasses();
 		while(it.hasNext()) {
 	         OntClass par = it.next();
-			if( par.getURI().equals(parent)) {
+			if( par.getURI().equals(model.expandPrefix(parent))) {
 				return true;
 			}
 		}
@@ -2236,19 +2254,23 @@ public class Dualist {
 		public List<Point> result;
 		LineString path;
 		String callerUri;
+		String callerOrg;
 		float maxDist;
 		
-		public QuadPointPathVisitor( List<Point> result, LineString path, float maxDist, String callerUri) {
+		public QuadPointPathVisitor( List<Point> result, LineString path, float maxDist, String callerUri, String callerOrg) {
 			this.path = path;
 			this.result = result;
 			this.maxDist = maxDist;
 			this.callerUri = callerUri;
+			this.callerOrg = callerOrg;
+
 		}
+		
 		
 		@Override
 		public void visitItem(Object item) {
 			Point p = (Point)item;
-			if( path.distance(p) < maxDist && !((String)(p.getUserData())).equals(callerUri)) {
+			if( path.distance(p) < maxDist && !((String)(p.getUserData())).equals(callerUri)&& !((String)(p.getUserData())).equals(callerOrg)) {
 				result.add(p);
 			}
 			
