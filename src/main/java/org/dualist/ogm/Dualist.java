@@ -333,8 +333,12 @@ public class Dualist {
 			if (resource == null || !model.contains(resource, null)) {
 				if (uri == null) { // if URI is not set, create a new URI
 									// with random hash
-					uri = namespace + resourceClass.getLocalName() + "."
-							+ UUID.randomUUID().toString();
+					String resName = "";					
+					if(res.getName() != null)
+						resName = res.getName() + "." + UUID.randomUUID().toString().substring(0,8);
+					else 
+						resName = UUID.randomUUID().toString().substring(0,14);
+					uri = namespace + resourceClass.getLocalName() + "." + resName	;
 					res.setUri(uri);
 				}
 
@@ -2036,9 +2040,6 @@ public class Dualist {
 	public Dataset getDataset() {
 		return dataset;
 	}
-
-	
-
 	
 	public Field getClassField( Class<?> type, String fieldName) throws Exception {
 		
@@ -2051,7 +2052,7 @@ public class Dualist {
 		
 	}
 	
-	public Field[] getAllClassFields( Class<?> type) {
+	private Field[] getAllClassFields( Class<?> type) {
 		LinkedList<Field> fs = new LinkedList<Field>();
 		getAllFieldsRec(fs, type);
 		return fs.toArray(new Field[0]);
@@ -2071,9 +2072,7 @@ public class Dualist {
 	 * Convert type of this resource. Potentially unsafe!
 	 */
 	public void convertType( String uri, String newType) {
-		try {
-
-			
+		try {		
 			Resource resource = null;
 			if( uri != null) {
 			// check if resource exists
