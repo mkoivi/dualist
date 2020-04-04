@@ -381,7 +381,7 @@ public class Dualist {
 			log.debug("Created resource having URI " + resource.getURI() );
 			
 			if( res.getLat() > 2 && res.getLon() > 2) {
-				updateLocation(res);
+				updateSpatialIndex(res);
 			}
 			
 			return resource;
@@ -393,7 +393,7 @@ public class Dualist {
 	}
 
 	
-	private void updateLocation(GraphResource res) {
+	public void updateSpatialIndex(GraphResource res) {
 		Point pt = (Point)resGeometries.get(res.getUri());
 		if( pt != null)		
 			t.remove(pt.getEnvelopeInternal(), pt);
@@ -734,7 +734,7 @@ public class Dualist {
 		res.setLat(lat);
 		res.setLon(lon);
 	//		this.sendLocationUpdateEvent(new URI(res.getUri()));
-		updateLocation( res);
+		updateSpatialIndex( res);
 		}catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
