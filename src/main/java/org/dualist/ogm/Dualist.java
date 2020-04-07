@@ -404,6 +404,19 @@ public class Dualist {
 		
 	}	
 	
+	
+	public void updateSpatialIndex(String uri, float lat, float lon) {
+		Point pt = (Point)resGeometries.get(uri);
+		if( pt != null)		
+			t.remove(pt.getEnvelopeInternal(), pt);
+		pt = gf.createPoint(new Coordinate(lon, lat));
+		pt.setUserData(uri);
+	    t.insert(pt.getEnvelopeInternal(), pt);
+	    resGeometries.put(uri, pt);
+		
+	}	
+	
+	
 	public List<String> queryByLocation( String callerUri, double minLon, double maxLon, double minLat, double maxLat ) {
 
 		List<String> res = new LinkedList<>();
@@ -1262,6 +1275,7 @@ public class Dualist {
 
 	public boolean isSubClassOf( String child, String parent ) {
 		OntClass o = ((OntModel)model).getOntClass(model.expandPrefix(child));
+		
 		if(o== null )
 			return false;
 		Iterator<OntClass> it = o.listSuperClasses();
@@ -1274,6 +1288,17 @@ public class Dualist {
 		return false;
 	}
 	
+	public String getResourceType( GraphResource resource) {
+		for( String t:resource.getTypes()) {
+			OntClass o = ((OntModel)model).getOntClass(t);
+			if( !o.listSubClasses().hasNext()) {
+				return t;
+			}
+		}
+		return null;
+		
+	}
+
 	private void populateInverseProperties(GraphResource res) {
 		// TODO Auto-generated method stub
 		try {
@@ -1424,6 +1449,11 @@ public class Dualist {
 						String[] types = pojoResource.getTypes();
 						types = ArrayUtils.add(types, object.toString());
 						pojoResource.setTypes(types);
+						
+		/*				OntClass o = ((OntModel)model).getOntClass(object.toString());
+						if( !o.listSubClasses().hasNext()) 
+							pojoResource.setType(object.toString());
+			*/			
 					}
 					continue; // skip RDF type predicate
 				}
@@ -1463,10 +1493,10 @@ public class Dualist {
 
 		this.putToCache(pojoResource);
 
-		
-
 		populateQueryProperties(pojoResource);
 
+	//	pojoResource.setDirectType(this.getType(pojoResource.getUriObj()));
+		
 	}
 
 	private void populateQueryProperties(GraphResource res) {
@@ -2035,6 +2065,10 @@ public class Dualist {
 	
 	public Model getModel() {
 		return model;
+	}
+
+	public Reasoner getReasoner() {
+		return reasoner;
 	}
 	
 	public Dataset getDataset() {

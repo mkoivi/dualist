@@ -10,7 +10,7 @@ public class GraphResource {
 
 	public String uri = null;
 	public String[] types;	
-	
+	public String type = null;
 	
 	public String graphUri = null;
 
@@ -211,6 +211,14 @@ public class GraphResource {
 
 	public void setName(String name) {
 		this.name = name;
+	}
+
+	public String getType() {
+		return types[0];
+	}
+
+	public void setType(String type) {
+		this.type = type;
 	}
 	
 	
