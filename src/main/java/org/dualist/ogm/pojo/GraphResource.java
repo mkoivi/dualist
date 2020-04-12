@@ -214,7 +214,7 @@ public class GraphResource {
 	}
 
 	public String getType() {
-		return types[0];
+		return type;
 	}
 
 	public void setType(String type) {

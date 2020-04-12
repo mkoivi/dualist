@@ -95,6 +95,9 @@ public class Dualist {
     
     HashMap<String, Geometry> resGeometries = new HashMap<>();
     
+    List<String> level0Classes = new LinkedList<>();
+    List<String> level1Classes = new LinkedList<>();
+    List<String> level2Classes = new LinkedList<>();
 	
 	HashMap<String, Class> defaultClasses = new HashMap<String, Class>();
 	
@@ -304,8 +307,16 @@ public class Dualist {
 					return null;
 				}
 				
+				String resType = null;
+				if(res.getType() != null) {
+					resType = res.getType();
+				}
+				else if( res.types != null && res.types.length == 1) {
+					resType = res.types[0];
+				}
+				
 				// if resource type is not defined in pojo types attribute, get the type from @OWLClass annotation
-				if( res.types == null || res.types.length == 0) {
+				if( resType == null) {
 					OWLClass ta = c.getAnnotation(OWLClass.class);
 	
 					// Get resource class 
@@ -314,7 +325,7 @@ public class Dualist {
 				}
 				else {
 					resourceClass = model
-							.getResource(model.expandPrefix(res.types[0]));
+							.getResource(model.expandPrefix(resType));
 				}
 			
 			}
@@ -345,7 +356,7 @@ public class Dualist {
 				resource = model.createResource(uri, resourceClass);
 				
 				res.setTypes(new String[] {resourceClass.toString()});
-				
+				res.setType(resourceClass.toString());
 				if( !res.getClass().toString().contains( "GraphResource"))
 					this.putToCache(res);
 				
@@ -1156,7 +1167,7 @@ public class Dualist {
 			
 			Resource s = model.getResource(model.expandPrefix(ref.uri));
 
-			if (objectCache.containsKey(s.toString()) && objectCache.get(s.toString()).getClass().equals(resourceClass)) {
+			if (objectCache.containsKey(s.toString()) && objectCache.get(s.toString()).getClass().equals(resourceClass) && ((objectCache.get(s.toString()).isPopulateProperties() && populateAttributeList) || ((objectCache.get(s.toString()).isPopulateProperties() && !populateAttributeList)))) {
 				resource = objectCache.get(s.toString());
 			} else {
 				resource = (GraphResource) Class
@@ -1168,6 +1179,10 @@ public class Dualist {
 				// Populate POJO and direct subclasses
 				populateFromGraph(resource, s);
 
+	/*			if (resourceClass.isAnnotationPresent(OWLClass.class)) {
+					OWLClass ta = ((Class<GraphResource>)resourceClass).getAnnotation(OWLClass.class);
+					resource.setType( model.expandPrefix(ta.value()));
+				}*/
 			}
 		} catch (InstantiationException e) {
 			log.error("Can't instantiate a defined class. Check that the class with the package name exists and there is a constructor with no attributes.");
@@ -1298,6 +1313,37 @@ public class Dualist {
 		return null;
 		
 	}
+	
+	public void initResourceTypeCache() {
+		
+		List<URI> allClasses = this.query("SELECT DISTINCT ?result {?result rdf:type owl:Class. FILTER (isURI(?result) && STRSTARTS(str(?result), str(wargame:) ) ) }");
+		for( URI c:allClasses) {
+			OntClass o = ((OntModel)model).getOntClass(c.toString());
+			if( !o.listSubClasses().hasNext()) {
+				level0Classes.add(c.toString().substring(c.toString().indexOf("#")+1));
+			}
+				
+		}
+/*		for( URI c:level0Classes) {
+			OntClass o = ((OntModel)model).getOntClass(c.toString());
+			Iterator<OntClass> is = o.listSuperClasses(false);
+			while( is.hasNext()) {
+				OntClass os =is.next();
+				if( !level1Classes.contains(new URI(os.getURI())))
+					level1Classes.add(c);
+			}
+		}
+		for( URI c:level1Classes) {
+			OntClass o = ((OntModel)model).getOntClass(c.toString());
+			Iterator<OntClass> is = o.listSuperClasses(false);
+			while( is.hasNext()) {
+				OntClass os =is.next();
+				if( !level2Classes.contains(new URI(os.getURI())))
+					level2Classes.add(c);
+			}
+		}	*/	
+	}
+	
 
 	private void populateInverseProperties(GraphResource res) {
 		// TODO Auto-generated method stub
@@ -1448,6 +1494,7 @@ public class Dualist {
 					if( !object.toString().contains("owl") && !object.toString().contains("rdfs") && !object.toString().contains("rdf-schema") && !object.toString().contains("wgs84_pos") && !object.toString().contains("geosparql") && !object.toString().contains("Class") && ( object.toString().contains(":") || object.toString().contains("/")  )) {
 						String[] types = pojoResource.getTypes();
 						types = ArrayUtils.add(types, object.toString());
+						
 						pojoResource.setTypes(types);
 						
 		/*				OntClass o = ((OntModel)model).getOntClass(object.toString());
@@ -1494,6 +1541,32 @@ public class Dualist {
 		this.putToCache(pojoResource);
 
 		populateQueryProperties(pojoResource);
+
+		if( pojoResource.getTypes() == null || pojoResource.getTypes().length == 0 ) {
+			
+		}
+		else if( pojoResource.getTypes().length == 1 ) 
+			pojoResource.setType(pojoResource.getTypes()[0]);
+		else {
+			for( String type:pojoResource.getTypes()) {
+				if( level0Classes.contains(type.toString().substring(type.toString().indexOf("#")+1)))
+					pojoResource.setType(type);
+			}
+			if( pojoResource.type == null) {
+				pojoResource.setType(this.getResourceType(pojoResource));
+		}
+	/*		for( String type:pojoResource.getTypes()) {
+				if( level1Classes.contains(new URI(type)))
+					pojoResource.setType(type);
+			}		
+		}
+		if( pojoResource.getType() == null) {
+			for( String type:pojoResource.getTypes()) {
+				if( level2Classes.contains(new URI(type)))
+					pojoResource.setType(type);
+			}	*/	
+		}		
+					
 
 	//	pojoResource.setDirectType(this.getType(pojoResource.getUriObj()));
 		
