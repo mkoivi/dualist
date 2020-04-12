@@ -403,6 +403,11 @@ public class Dualist {
 		return null;
 	}
 
+	public void deleteFromSpatialIndex(String uri) {
+		Point pt = (Point)resGeometries.get(uri);
+		if( pt != null)		
+			t.remove(pt.getEnvelopeInternal(), pt);
+	}
 	
 	public void updateSpatialIndex(GraphResource res) {
 		Point pt = (Point)resGeometries.get(res.getUri());
@@ -851,7 +856,7 @@ public class Dualist {
 
 			objectCache.remove(uri.toString());
 
-
+			deleteFromSpatialIndex(uri.toString());
 		} catch (Exception e) {
 			log.error("Exception during deleting of a graph ", e);
 		}
@@ -1167,9 +1172,14 @@ public class Dualist {
 			
 			Resource s = model.getResource(model.expandPrefix(ref.uri));
 
-			if (objectCache.containsKey(s.toString()) && objectCache.get(s.toString()).getClass().equals(resourceClass) && ((objectCache.get(s.toString()).isPopulateProperties() && populateAttributeList) || ((objectCache.get(s.toString()).isPopulateProperties() && !populateAttributeList)))) {
+			boolean populateNew = true;
+			if (objectCache.containsKey(s.toString()) ) {
 				resource = objectCache.get(s.toString());
-			} else {
+				if( resourceClass.isInstance(resource) && ((resource.isPopulateProperties() && populateAttributeList) || (resource.isPopulateProperties() && !populateAttributeList) || (!resource.isPopulateProperties() && !populateAttributeList))) {
+					populateNew = false;
+				}
+			}
+			if( populateNew ) {
 				resource = (GraphResource) Class
 						.forName(resourceClass.getName()).newInstance();
 				
@@ -1567,7 +1577,7 @@ public class Dualist {
 			}	*/	
 		}		
 					
-
+		updateSpatialIndex( pojoResource);
 	//	pojoResource.setDirectType(this.getType(pojoResource.getUriObj()));
 		
 	}
