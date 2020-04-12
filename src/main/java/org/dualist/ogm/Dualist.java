@@ -414,13 +414,13 @@ public class Dualist {
 		if( pt != null)		
 			t.remove(pt.getEnvelopeInternal(), pt);
 		pt = gf.createPoint(new Coordinate(res.getLon(), res.getLat()));
-		pt.setUserData(res.getUri());
+		pt.setUserData(res);
 	    t.insert(pt.getEnvelopeInternal(), pt);
 	    resGeometries.put(res.getUri(), pt);
 		
 	}	
 	
-	
+	/*
 	public void updateSpatialIndex(String uri, float lat, float lon) {
 		Point pt = (Point)resGeometries.get(uri);
 		if( pt != null)		
@@ -430,10 +430,10 @@ public class Dualist {
 	    t.insert(pt.getEnvelopeInternal(), pt);
 	    resGeometries.put(uri, pt);
 		
-	}	
+	}*/	
 	
 	
-	public List<String> queryByLocation( String callerUri, double minLon, double maxLon, double minLat, double maxLat ) {
+/*	public List<String> queryByLocation( String callerUri, double minLon, double maxLon, double minLat, double maxLat ) {
 
 		List<String> res = new LinkedList<>();
 		
@@ -445,22 +445,22 @@ public class Dualist {
 	        }
 	    return res;
 	}
-	
+	*/
 	
 	/*
 	 * Returns points, containing URI as userData
 	 */
-	public List<Point> queryPointsByLocation( String callerUri, double minLon, double maxLon, double minLat, double maxLat ) {
+/*	public List<Point> queryPointsByLocation( String callerUri, double minLon, double maxLon, double minLat, double maxLat ) {
 		List<Point> ps = new LinkedList<>();
 		Envelope e = new Envelope( minLon, maxLon, minLat, maxLat);
 		t.query(e, new QuadPointVisitor( minLat, minLon, maxLat,maxLon, ps, callerUri));
 	    return ps;
 	}
-	
+	*/
 	/*
 	 * Returns points, containing URI as userData
 	 */
-	public List<Point> queryPointsByPath( String callerUri, String callerOrg, float sLon, float tLon, float sLat, float tLat, float maxDist) {
+	/*public List<Point> queryPointsByPath( String callerUri, String callerOrg, float sLon, float tLon, float sLat, float tLat, float maxDist) {
 
 		LineString path = gf.createLineString(new Coordinate[] {new Coordinate(sLon,sLat), new Coordinate(tLon,tLat)});
 
@@ -470,8 +470,12 @@ public class Dualist {
 		t.query(e, new QuadPointPathVisitor( ps,path, maxDist, callerUri, callerOrg));
 	    return ps;
 	}
-	
-	
+	*/
+	public void querySpatial( Envelope e,ItemVisitor v) {
+		t.query(e, v);
+		return;
+	}
+
 	
 	public URI createEmptyResource( URI type ) {
 		Resource resourceClass = model
@@ -1804,6 +1808,7 @@ public class Dualist {
 						
 						if (f.getType().toString()
 								.contains("org.dualist.ogm.pojo.URI")) {
+							
 							org.dualist.ogm.pojo.URI uri = new org.dualist.ogm.pojo.URI(object.toString());
 							Method setter;
 							setter = pojoResource.getClass().getMethod(
@@ -2335,7 +2340,7 @@ public class Dualist {
 	
 	
 	
-	public class QuadPointVisitor implements ItemVisitor {
+/*	public class QuadPointVisitor implements ItemVisitor {
 
 		public List<Point> result;
 		
@@ -2394,7 +2399,7 @@ public class Dualist {
 		
 	
 	}
-	
+	*/
 	
 	public List<GraphResource.Attribute> dumpResourceAttributes(String uri) {
 		List<GraphResource.Attribute> props = new LinkedList<>();
