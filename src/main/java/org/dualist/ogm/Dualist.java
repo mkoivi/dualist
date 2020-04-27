@@ -59,6 +59,7 @@ import org.apache.jena.reasoner.ReasonerFactory;
 import org.apache.jena.reasoner.ReasonerRegistry;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
+import org.apache.jena.riot.RDFFormat;
 import org.apache.jena.util.FileManager;
 import org.apache.jena.vocabulary.OWL2;
 import org.apache.jena.vocabulary.RDF;
@@ -228,17 +229,35 @@ public class Dualist {
 		model.write(System.out);
 	}
 	
-	public void saveModel( String fileName ) {
+	public void saveModel( String fileName, String outputLang ) {
 		OutputStream out;
 		try {
+			if( outputLang.equals("JSON_LD_FLAT")) {
+				out = new FileOutputStream(fileName);
+				RDFDataMgr.write(out, model, RDFFormat.JSONLD_FLAT);
+				return;
+			}
+			
+			Lang lang = null;
+			if( outputLang.equals("TTL"))
+				lang = Lang.TURTLE;
+			else if( outputLang.equals("CSV"))
+				lang = Lang.CSV;
+			else if( outputLang.equals("JSON"))
+				lang = Lang.JSONLD;
 			out = new FileOutputStream(fileName);
-			RDFDataMgr.write(out, model, Lang.TURTLE);
+			RDFDataMgr.write(out, model, lang);
+			
+			
+			
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	
 	}
+	
+
 	/* Initiate model reasoner (RDFS) and replace the original model with inferred model.
 	 * 
 	 * https://jena.apache.org/documentation/inference/#RDFSintro
