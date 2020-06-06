@@ -1023,7 +1023,9 @@ public class Dualist {
 						GraphResource resource;
 						if (objectCache.containsKey(s.toString()) && objectCache.get(s.toString()).getClass().equals(resourceClass)) {
 							resource = objectCache.get(s.toString());
+							log.info("cache hit (query) " + s.toString());
 						} else {
+							log.info("cache miss (query) " + s.toString());
 							resource = (GraphResource) Class
 									.forName(resourceClass.getName()).newInstance();
 		
@@ -1203,6 +1205,7 @@ public class Dualist {
 				}
 			}
 			if( populateNew ) {
+				log.debug("cache miss: " + ref.toString());
 				resource = (GraphResource) Class
 						.forName(resourceClass.getName()).newInstance();
 				
@@ -1524,7 +1527,7 @@ public class Dualist {
 			if (object instanceof Resource) {
 				// object is a resource
 				if (predicate.toString().endsWith("ns#type")) {
-					if( !object.toString().contains("owl") && !object.toString().contains("rdfs") && !object.toString().contains("rdf-schema") && !object.toString().contains("wgs84_pos") && !object.toString().contains("geosparql") && !object.toString().contains("Class") && ( object.toString().contains(":") || object.toString().contains("/")  )) {
+					if( !object.toString().contains("owl")  && !object.toString().contains("rdfs") && !object.toString().contains("rdf-schema") && !object.toString().contains("wgs84_pos") && !object.toString().contains("geosparql") && !object.toString().contains("Class") && ( object.toString().contains(":") || object.toString().contains("/")  )) {
 						String[] types = pojoResource.getTypes();
 						types = ArrayUtils.add(types, object.toString());
 						
@@ -1537,6 +1540,8 @@ public class Dualist {
 					}
 					continue; // skip RDF type predicate
 				}
+				else if (predicate.toString().contains("subClassOf"))
+					continue;
 
 				instantiateResourceProperty(pojoResource, predicate, object);
 				
@@ -1756,7 +1761,7 @@ public class Dualist {
 	protected void instantiateResourceProperty(GraphResource pojoResource,
 			Property predicate, RDFNode object) {
 		try {
-			
+		//	log.info("instantiate " + object.toString());
 			AttributeRestriction ar = null;
 			String pojoAttributeName = null;
 			
