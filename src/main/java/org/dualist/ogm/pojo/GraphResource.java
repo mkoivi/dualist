@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.dualist.ogm.Dualist;
 import org.dualist.ogm.annotations.OWLProperty;
 
 public class GraphResource {
@@ -13,6 +14,8 @@ public class GraphResource {
 	public String type = null;
 	
 	public String graphUri = null;
+	
+	Dualist graph = null;
 
 	boolean populateProperties = false;	
 	
@@ -145,8 +148,11 @@ public class GraphResource {
 
 
 	public String toString() {
-		
-		String ret = types[0] + ": " + uri + "; ";
+		String type = "[untyped]"; 
+		if( types != null && types.length > 0) {
+			type = types[0];
+		}
+		String ret = type + ": " + uri + "; ";
 			if( properties != null) {
 			for( Attribute a : properties ) {
 				ret+= a.name + " = " + a.value + ", ";
