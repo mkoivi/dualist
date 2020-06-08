@@ -553,7 +553,7 @@ public class Dualist {
 					.getProperty(model.expandPrefix(taf.value()));
 			
 				createGraphAttribute( resource, property, value,taf.populateReferencedResource() );
-				log.debug( "Handled attribute " + f.getName() + ", graph property " + taf.value() +  ", value " + value.toString());
+//				log.debug( "Handled attribute " + f.getName() + ", graph property " + taf.value() +  ", value " + value.toString());
 			}
 		}
 	}	
