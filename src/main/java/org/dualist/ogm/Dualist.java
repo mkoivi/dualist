@@ -1208,7 +1208,7 @@ public class Dualist {
 				log.debug("cache miss: " + ref.toString());
 				resource = (GraphResource) Class
 						.forName(resourceClass.getName()).newInstance();
-				
+				resource.setGraph(this);
 				resource.setUri (ref.uri);
 				resource.setPopulateProperties(populateAttributeList);
 				objectCache.put(s.toString(), resource);

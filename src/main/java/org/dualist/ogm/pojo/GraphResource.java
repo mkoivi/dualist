@@ -226,6 +226,14 @@ public class GraphResource {
 	public void setType(String type) {
 		this.type = type;
 	}
+
+	public Dualist getGraph() {
+		return graph;
+	}
+
+	public void setGraph(Dualist graph) {
+		this.graph = graph;
+	}
 	
 	
 
