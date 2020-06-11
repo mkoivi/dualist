@@ -69,6 +69,7 @@ import org.dualist.ogm.annotations.OWLClass;
 import org.dualist.ogm.annotations.OWLProperty;
 import org.dualist.ogm.event.LocationUpdateListener;
 import org.dualist.ogm.pojo.GraphResource;
+import org.dualist.ogm.pojo.GraphResource.Attribute;
 import org.dualist.ogm.pojo.GraphResource.AttributeRestriction;
 import org.dualist.ogm.pojo.URI;
 import org.locationtech.jts.geom.Coordinate;
@@ -100,7 +101,7 @@ public class Dualist {
     List<String> level1Classes = new LinkedList<>();
     List<String> level2Classes = new LinkedList<>();
 	
-	HashMap<String, Class> defaultClasses = new HashMap<String, Class>();
+	HashMap<String, Class> resourceClasses = new HashMap<String, Class>();
 	
 	 protected OntModel model;
 
@@ -177,9 +178,54 @@ public class Dualist {
 	 * Register default pojo class to be instantiated for a resource OWL class. Basically a reverse mapping for @OWLClass annotation for Java classes
 	 *	 * 
 	 */
-	public void registerDefaultClass(String owlClassUri, Class className) {
-		defaultClasses.put(model.expandPrefix(owlClassUri), className);
+	public void registerResourceClass(String owlClassUri, Class className) {
+		resourceClasses.put(model.expandPrefix(owlClassUri), className);
 	}
+	
+	
+	private Class resolveResourceClass(String uri) {
+		Class defClass = null;
+		defClass = resourceClasses.get(model.expandPrefix(uri));
+		
+		if( defClass == null) {
+			String superC = this.getSuperClass(model.expandPrefix(uri));
+			defClass = resourceClasses.get(superC);
+			if( defClass == null) {
+				String superC2 = this.getSuperClass(superC);
+				defClass = resourceClasses.get(superC2);
+				if( defClass == null) {
+					String superC3 = this.getSuperClass(superC2);
+					defClass = resourceClasses.get(superC3);
+					if( defClass == null) {
+						String superC4 = this.getSuperClass(superC3);
+						defClass = resourceClasses.get(superC4);
+					}
+					else {
+							registerResourceClass( uri,  defClass);
+							registerResourceClass( superC2,  defClass);
+							registerResourceClass( superC,  defClass);
+					}
+
+				}
+				else {
+					registerResourceClass( uri,  defClass);
+					registerResourceClass( superC,  defClass);
+				}
+
+			}
+			else {
+				registerResourceClass( superC,  defClass);
+			}
+		}
+
+
+		if( defClass == null) {
+			defClass = GraphResource.class;	
+			log.error("SEVERE WARNING! Class not found for resource type: " + uri);
+		}
+		return defClass;
+	}
+	
 
 	public void setBaseNs(String baseNs) {
 		this.baseNs = baseNs;
@@ -546,7 +592,7 @@ public class Dualist {
 	
 			Object value = getter.invoke(res); // invoke getXXX method
 			if( value == null) {
-				log.debug("Method call returned null value: " + getter.getName());
+//				log.debug("Method call returned null value: " + getter.getName());
 			}
 			else {
 				Property property = model
@@ -721,7 +767,7 @@ public class Dualist {
 			}
 			
 			// update the object in the cache
-			objectCache.put(res.getUri(), res);
+			putToCache( res);
 
 		} catch (Exception e) {
 			log.error("Exception during modifying of a graph ", e);
@@ -814,7 +860,7 @@ public class Dualist {
 		if( value != null)
 			createGraphAttribute(resource, property, value,false);
 		
-		objectCache.remove(resUri);
+	//	objectCache.remove(resUri);
 
 		
 		
@@ -918,15 +964,12 @@ public class Dualist {
 				// log.debug(soln.toString());
 				
 				GraphResource resource;
-				if (objectCache.containsKey(subject.toString()) && objectCache.get(subject.toString()).getClass().equals(resourceClass)) {
+				if (objectCache.containsKey(subject.toString()) ) {
 					resource = objectCache.get(subject.toString());
 				} else {
-					resource = (GraphResource) Class
-							.forName(resourceClass.getName()).newInstance();
-
 					// Populate POJO and direct subclasses
-					populateFromGraph(resource, subject);
-					objectCache.put(subject.toString(), resource);
+					resource = populateFromGraph(subject);
+					this.putToCache( resource);
 				}
 				resPojoList.add(resource);
 			}
@@ -1021,17 +1064,15 @@ public class Dualist {
 						Resource s = soln.getResource("result");
 						
 						GraphResource resource;
-						if (objectCache.containsKey(s.toString()) && objectCache.get(s.toString()).getClass().equals(resourceClass)) {
+						if (objectCache.containsKey(s.toString()) ) {
 							resource = objectCache.get(s.toString());
 							log.info("cache hit (query) " + s.toString());
 						} else {
 							log.info("cache miss (query) " + s.toString());
-							resource = (GraphResource) Class
-									.forName(resourceClass.getName()).newInstance();
-		
+						
 							// Populate POJO and direct subclasses
-							populateFromGraph(resource, s);
-							objectCache.put(s.toString(), resource);
+							resource = populateFromGraph(s);
+							putToCache(resource);
 						}
 				resPojoList.add(resource);
 			}
@@ -1176,13 +1217,7 @@ public class Dualist {
 		return get(new URI(uri), resourceClass, false);
 	}
 	
-	/* 
-	 * Get a POJO by URI
-	 */
-	public <T extends GraphResource> T get(String uri, Class resourceClass, boolean populateAttributeList) {
-		return get(new URI(uri), resourceClass, populateAttributeList);
-	}
-		
+	
 	/* 
 	 * Get a POJO by URI
 	 */
@@ -1196,46 +1231,26 @@ public class Dualist {
 			}
 			
 			Resource s = model.getResource(model.expandPrefix(ref.uri));
-
+	
 			boolean populateNew = true;
 			if (objectCache.containsKey(s.toString()) ) {
 				resource = objectCache.get(s.toString());
-				if( resourceClass.isInstance(resource) && ((resource.isPopulateProperties() && populateAttributeList) || (resource.isPopulateProperties() && !populateAttributeList) || (!resource.isPopulateProperties() && !populateAttributeList))) {
-					populateNew = false;
-				}
 			}
-			if( populateNew ) {
+			else {
 				log.debug("cache miss: " + ref.toString());
-				resource = (GraphResource) Class
-						.forName(resourceClass.getName()).newInstance();
-				resource.setGraph(this);
-				resource.setUri (ref.uri);
-				resource.setPopulateProperties(populateAttributeList);
-				objectCache.put(s.toString(), resource);
-				// Populate POJO and direct subclasses
-				populateFromGraph(resource, s);
 
-	/*			if (resourceClass.isAnnotationPresent(OWLClass.class)) {
-					OWLClass ta = ((Class<GraphResource>)resourceClass).getAnnotation(OWLClass.class);
-					resource.setType( model.expandPrefix(ta.value()));
-				}*/
+				resource = populateFromGraph( s);
+
 			}
-		} catch (InstantiationException e) {
-			log.error("Can't instantiate a defined class. Check that the class with the package name exists and there is a constructor with no attributes.");
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IllegalAccessException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+	
 
 		return (T) resource;
+		}
+	catch( Exception e) {
+		e.printStackTrace();
 	}
-
-
+		return null;
+	}
 	/*
 	 * Instantiates a list of URIs to list of classes. Uses defaultClass to resolve resource's class if not found in cache.
 	 * 
@@ -1260,7 +1275,7 @@ public class Dualist {
 		for( URI uri: uris) {
 			GraphResource res = objectCache.get(uri.toString());
 			if( res == null) {
-				res = get(uri, resolveDefaultClass( uri.toString()), false);
+				res = get(uri, null);
 			}
 			resPojoList.add(res);
 		}
@@ -1269,30 +1284,7 @@ public class Dualist {
 	}
 	
 	
-	
-	private Class resolveDefaultClass(String uri) {
-	//	String type = null;
-		//try {
-		OntResource r = model.getOntResource(model.expandPrefix(uri));
-		Resource type = r.getRDFType(true);
-	/*	StmtIterator iter = model.listStatements(
-				new SimpleSelector(r, RDF.type, (RDFNode) null));
-		
-			Statement stmt = iter.nextStatement(); // get next statement
-			Resource subject = stmt.getSubject(); // get the subject
-			Property predicate = stmt.getPredicate(); // get the predicate
-			RDFNode object = stmt.getObject(); // get the object
-			type = object.toString();
-		}
-		catch( Exception e) {
-			e.printStackTrace();
-		}*/
-		Class defClass = GraphResource.class;	
-		if( type != null && defaultClasses.containsKey(type.getURI()))
-			defClass = defaultClasses.get(type.getURI());
-			
-		return defClass;
-	}
+
 
 	protected void populateLiteralProperties(GraphResource pojoResource,
 			Resource resource) {
@@ -1339,6 +1331,20 @@ public class Dualist {
 		return false;
 	}
 	
+	public String getSuperClass( String child ) {
+		OntClass o = ((OntModel)model).getOntClass(model.expandPrefix(child));
+		
+		if(o== null )
+			return null;
+		
+		OntClass superC = o.getSuperClass();
+		if( superC != null )
+			return superC.getURI();
+		return null;
+	
+	}
+	
+	
 	public String getResourceType( GraphResource resource) {
 		for( String t:resource.getTypes()) {
 			OntClass o = ((OntModel)model).getOntClass(t);
@@ -1349,6 +1355,18 @@ public class Dualist {
 		return null;
 		
 	}
+	
+	public String getResourceType( List<String> types) {
+		for( String t:types) {
+			OntClass o = ((OntModel)model).getOntClass(t);
+			if( !o.listSubClasses().hasNext()) {
+				return t;
+			}
+		}
+		return null;
+		
+	}
+	
 	
 	public void initResourceTypeCache() {
 		
@@ -1381,7 +1399,7 @@ public class Dualist {
 	}
 	
 
-	private void populateInverseProperties(GraphResource res) {
+/*	private void populateInverseProperties(GraphResource res) {
 		// TODO Auto-generated method stub
 		try {
 			Resource resourceClass;
@@ -1501,7 +1519,7 @@ public class Dualist {
 		}
 	}
 	
-	
+	*/
 	
 	
 
@@ -1511,103 +1529,110 @@ public class Dualist {
 	 * Verify that no circular references exist in the graph
 	 * 
 	 */
-	protected void populateFromGraph(GraphResource pojoResource,
-			Resource resource) {
-
-		pojoResource.setUri(resource.getURI());
+	protected GraphResource populateFromGraph(Resource resource) {
 
 		StmtIterator iter = model.listStatements(
 				new SimpleSelector(resource, null, (RDFNode) null));
+		
+		List<Property> properties = new LinkedList<>();
+		List<RDFNode> objects = new LinkedList<>();
+		List<String> types = new LinkedList<>();
+		
+		// get all triples
 		while (iter.hasNext()) {
 			Statement stmt = iter.nextStatement(); // get next statement
 			Resource subject = stmt.getSubject(); // get the subject
 			Property predicate = stmt.getPredicate(); // get the predicate
 			RDFNode object = stmt.getObject(); // get the object
+
+			// if a rdf:type triple, add to types
+			if (predicate.toString().endsWith("ns#type")) {
+				if( !object.toString().contains("owl")  && !object.toString().contains("rdfs") && !object.toString().contains("rdf-schema") && !object.toString().contains("wgs84_pos") && !object.toString().contains("geosparql") && !object.toString().contains("Class") && ( object.toString().contains(":") || object.toString().contains("/")  )) {
+					types.add( object.toString());
+				}
+			}
+			else {
+				properties.add(predicate);
+				objects.add(object);	
+			}
+		}
+		
+		// resolve resource type
+		String resourceType = null;
+		
+		if( types.size() == 0 ) {
 			
+		}
+		else if( types.size() == 1 ) 
+			resourceType = types.get(0);
+		else {
+			for( String type:types) {
+				if( level0Classes.contains(type.toString().substring(type.toString().indexOf("#")+1)))
+					resourceType = type;
+			}
+			if( resourceType == null) 
+				resourceType = this.getResourceType(types);
+		}
+		
+		Class resourceClass = this.resolveResourceClass(resourceType);	
+		GraphResource pojoResource;
+		try {
+			pojoResource = (GraphResource) Class
+						.forName(resourceClass.getName()).newInstance();
+
+		pojoResource.setGraph(this);
+		pojoResource.setUri (resource.getURI());
+		pojoResource.setType(resourceType);
+		pojoResource.setTypes((String[])(types.toArray(new String[types.size()])));
+	//	pojoResource.setPopulateProperties(populateAttributeList);
+		putToCache( pojoResource);
+			// Populate POJO and direct subclasses	
+			
+			
+		int i=0;	
+		for(Property predicate: properties) {
+			RDFNode object = objects.get(i);
+			i++;
 			if (object instanceof Resource) {
 				// object is a resource
-				if (predicate.toString().endsWith("ns#type")) {
-					if( !object.toString().contains("owl")  && !object.toString().contains("rdfs") && !object.toString().contains("rdf-schema") && !object.toString().contains("wgs84_pos") && !object.toString().contains("geosparql") && !object.toString().contains("Class") && ( object.toString().contains(":") || object.toString().contains("/")  )) {
-						String[] types = pojoResource.getTypes();
-						types = ArrayUtils.add(types, object.toString());
-						
-						pojoResource.setTypes(types);
-						
-		/*				OntClass o = ((OntModel)model).getOntClass(object.toString());
-						if( !o.listSubClasses().hasNext()) 
-							pojoResource.setType(object.toString());
-			*/			
-					}
-					continue; // skip RDF type predicate
-				}
-				else if (predicate.toString().contains("subClassOf"))
+				if (predicate.toString().contains("subClassOf"))
 					continue;
 
 				instantiateResourceProperty(pojoResource, predicate, object);
 				
-				// add property if defined to be populated for this pojo
-	/*			if( pojoResource.isPopulateProperties()) { 
-					List<GraphResource.Attribute> props = pojoResource.getAttributes();
-					if( props == null)
-						props = new LinkedList<GraphResource.Attribute>();
-					
-					props.add(pojoResource.new Attribute( predicate.getLocalName(), ((Resource) object).getURI()));
-					pojoResource.setAttributes(props);
-				}*/
 			
 			} else {
 				// object is a literal
 
 				setPropertyValue(pojoResource, predicate, object);
-				
-				// add property if defined to be populated for this pojo
-			/*	if( pojoResource.isPopulateProperties()) { 
-					List<GraphResource.Attribute> props = pojoResource.getAttributes();
-					if( props == null)
-						props = new LinkedList<GraphResource.Attribute>();
-					props.add(pojoResource.new Attribute( predicate.getLocalName(), object.toString()));
-					pojoResource.setAttributes(props);
 				}
-				*/
-			}
 		}
 
 		if( populateSparqlProperties )
 			populateQueryProperties(pojoResource);
 		pojoResource.setReference(false);
 
-		this.putToCache(pojoResource);
+//		this.putToCache(pojoResource);
 
 		populateQueryProperties(pojoResource);
 
-		if( pojoResource.getTypes() == null || pojoResource.getTypes().length == 0 ) {
-			
-		}
-		else if( pojoResource.getTypes().length == 1 ) 
-			pojoResource.setType(pojoResource.getTypes()[0]);
-		else {
-			for( String type:pojoResource.getTypes()) {
-				if( level0Classes.contains(type.toString().substring(type.toString().indexOf("#")+1)))
-					pojoResource.setType(type);
-			}
-			if( pojoResource.type == null) {
-				pojoResource.setType(this.getResourceType(pojoResource));
-		}
-	/*		for( String type:pojoResource.getTypes()) {
-				if( level1Classes.contains(new URI(type)))
-					pojoResource.setType(type);
-			}		
-		}
-		if( pojoResource.getType() == null) {
-			for( String type:pojoResource.getTypes()) {
-				if( level2Classes.contains(new URI(type)))
-					pojoResource.setType(type);
-			}	*/	
-		}		
+	
 					
 		updateSpatialIndex( pojoResource);
-	//	pojoResource.setDirectType(this.getType(pojoResource.getUriObj()));
 		
+		return pojoResource;
+	//	pojoResource.setDirectType(this.getType(pojoResource.getUriObj()));
+		} catch (InstantiationException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalAccessException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return null;
 	}
 
 	private void populateQueryProperties(GraphResource res) {
@@ -1700,16 +1725,13 @@ public class Dualist {
 								if (objectCache.containsKey(s.toString())) {
 									instance = objectCache.get(s.toString());
 								} else {
-									instance = (GraphResource) Class
-											.forName(pojoClass).newInstance();
-									instance.setUri(s.toString());
-									instance.setReference(true);
+									instance = populateFromGraph( s);
 									this.putToCache(instance);
 								}
-								if(ta.populateReferencedResource() && instance.isReference()) {
+							/*	if(ta.populateReferencedResource() && instance.isReference()) {
 									populateFromGraph(instance, s);
 									instance.setReference(false);
-								}
+								}*/
 								this.putToCache(instance);
 								
 								resPojoList.add(instance);
@@ -1747,6 +1769,89 @@ public class Dualist {
 		}
 	}
 
+	
+	/*
+	 * isMin = true -> minCardinality
+	 * isMin = false -> maxCardinality
+	 * 
+	 */
+	public List<Attribute> getAttributeMetadata( GraphResource res) {
+		
+		if( res.isPopulateProperties())
+			return res.getAttributes();
+		Class resClass = res.getClass();
+		
+		
+		Resource resource = model.getResource(res.getUri());
+
+		StmtIterator iter = model.listStatements(
+			new SimpleSelector(resource, null, (RDFNode) null));
+
+		
+		// get all triples
+		while (iter.hasNext()) {
+			Statement stmt = iter.nextStatement(); // get next statement
+		//	Resource subject = stmt.getSubject(); // get the subject
+			Property predicate = stmt.getPredicate(); // get the predicate
+			RDFNode object = stmt.getObject(); // get the object
+	
+			// if a rdf:type triple, add to types
+			if (predicate.toString().endsWith("ns#type")) {
+				continue;
+			}
+		
+			GraphResource.AttributeRestriction ar = null;
+			OntProperty p2 = model.getOntProperty(predicate.getURI());
+			Iterator<Restriction> i = p2.listReferringRestrictions();
+			while (i.hasNext()) {
+			    Restriction r = i.next();
+			    if( r.getPropertyValue( OWL2.minQualifiedCardinality) != null ) {
+				    	ar = res.new AttributeRestriction(GraphResource.ATTRIBUTE_RESTRICTION.MIN_CARDINALITY, r.getPropertyValue( OWL2.minQualifiedCardinality).asLiteral().getInt());
+				    	
+				    }
+				    else if( r.getPropertyValue( OWL2.maxQualifiedCardinality) != null ) {
+				    	ar = res.new AttributeRestriction(GraphResource.ATTRIBUTE_RESTRICTION.MAX_CARDINALITY, r.getPropertyValue( OWL2.maxQualifiedCardinality).asLiteral().getInt());						    
+				    }
+			}
+
+			// get the attribute basic name (for example requires5 -> requires)
+			String attrName = null;
+			Field[] fields = getAllClassFields( resClass);
+			for (Field f : fields) {
+				if (f.isAnnotationPresent(OWLProperty.class)) {
+					OWLProperty ta = f.getAnnotation(OWLProperty.class);
+					
+					if (ta.value().equals(predicate.toString())
+							|| model.expandPrefix(ta.value())
+									.equals(predicate.getURI()) || model.expandPrefix(ta.value2() ).equals(predicate.getURI()) || model.expandPrefix(ta.value3() ).equals(predicate.getURI()) || model.expandPrefix(ta.value4() ).equals(predicate.getURI()) || model.expandPrefix(ta.value5() ).equals(predicate.getURI()) || model.expandPrefix(ta.value6() ).equals(predicate.getURI()) )  {					
+						attrName = f.getName();
+					}
+				}
+			}
+			if( attrName == null) 
+				continue;
+			List<GraphResource.Attribute> props = res.getAttributes();
+			GraphResource.Attribute att = null;
+			if( object instanceof Resource)
+				att = res.new Attribute( attrName,predicate.getURI(),((Resource) object).getURI());
+			else if( object instanceof Literal) {
+				String cleanedLiteralValue = object.toString();
+				if( cleanedLiteralValue.indexOf('^') > 0 ) {
+					cleanedLiteralValue = cleanedLiteralValue.substring(0, cleanedLiteralValue.indexOf('^'));
+				}
+				att = res.new Attribute( attrName,predicate.getURI(),cleanedLiteralValue);
+
+			}
+			if( ar != null) 
+				att.restriction = ar;
+			props.add(att);
+			res.setAttributes(props);
+		}
+		return res.getAttributes();
+		
+	}
+	
+	
 	/*
 	 * Populate resource property in POJO model. Uses getXXX and setXXX to
 	 * access values.
@@ -1808,13 +1913,6 @@ public class Dualist {
 						pojoAttributeName = f.getName();
 						if( ta.hasRestrictions()) {
 							
-							StmtIterator iter = predicate.listProperties();
-							while (iter.hasNext()) {
-								Statement stmt = iter.nextStatement(); // get next statement
-								Resource s = stmt.getSubject(); // get the subject
-								Property p = stmt.getPredicate(); // get the predicate
-								RDFNode o = stmt.getObject(); // get the object
-							}
 							OntProperty p = model.getOntProperty(predicate.getURI() );
 							Iterator<Restriction> i = p.listReferringRestrictions();
 							while (i.hasNext()) {
@@ -1920,17 +2018,16 @@ public class Dualist {
 								if (objectCache.containsKey(object.toString())) {
 									instance = objectCache.get(object.toString());
 								} else {
-									instance = (GraphResource) Class
-											.forName(pojoClass).newInstance();
-									instance.setUri(object.toString());
-									instance.setReference(true);
+									Resource subRes = model
+											.getResource(object.toString());
+									instance = populateFromGraph(subRes);
 								}
-								if(ta.populateReferencedResource() && instance.isReference()) {
+						/*		if(ta.populateReferencedResource() && instance.isReference()) {
 									Resource subRes = model
 											.getResource(object.toString());
 									populateFromGraph(instance, subRes);
 									
-								}
+								}*/
 								this.putToCache(instance);
 							
 								Method getter = pojoResource.getClass()
@@ -1969,7 +2066,7 @@ public class Dualist {
 							if(ta.populateReferencedResource() && instance.isReference()) {							
 								Resource subRes = model
 										.getResource(object.toString());
-								populateFromGraph(instance, subRes);
+								instance = populateFromGraph( subRes);
 								}
 							this.putToCache(instance);
 							Method setter;
@@ -1979,8 +2076,13 @@ public class Dualist {
 													.toUpperCase()
 											+ f.getName().substring(1),
 									Class.forName(f.getType().getName()));
-							
-							setter.invoke(pojoResource, instance); // invoke getXXX 
+							try {
+ 							setter.invoke(pojoResource, instance); // invoke getXXX
+							}
+							catch( IllegalArgumentException e) {
+								log.error("Could not call" + setter.toString() + " with " + instance.toString() );
+								e.printStackTrace();
+							}
 						}
 						
 						if( pojoResource.isPopulateProperties()) {
@@ -2347,6 +2449,11 @@ public class Dualist {
 		if( obj.getUri() == null ) {
 			log.error("ERROR: trying to put a null object to cache! ");
 			return;
+		}
+		GraphResource obj2 = objectCache.get(obj.getUri());
+		
+		if( obj2 != null && System.identityHashCode(obj2) != System.identityHashCode(obj2)) {
+			log.error("Trying to insert different object to cache!");
 		}
 		objectCache.put(obj.getUri(), obj);
 	}

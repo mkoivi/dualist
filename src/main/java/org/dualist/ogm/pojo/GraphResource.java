@@ -64,13 +64,6 @@ public class GraphResource {
 		this.graphUri = graphUri;
 	}
 	
-	public List<Attribute> getProperties() {
-		return properties;
-	}
-
-	public void setProperties(List<Attribute> properties) {
-		this.properties = properties;
-	}
 
 	public void copy(GraphResource copy){
 		copy.graphUri = this.graphUri;
