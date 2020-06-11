@@ -824,11 +824,12 @@ public class Dualist {
 	 * attributeName is the Java class attribute name; graph attribute name is retrieved from OWLPropery annotation!
 	 * Does not work with alternative OWLProperty attributes (value2, value3....)
 	 */
-	public void updateLocation(GraphResource res, float lat, float lon)  {
+	public void updateLocation(GraphResource res, float lat, float lon, boolean writeToGraph)  {
 		try {
-			
-		this.modifyAttributeDirect(res.getUri(), "http://www.w3.org/2003/01/geo/wgs84_pos#lat", lat);
-		this.modifyAttributeDirect(res.getUri(), "http://www.w3.org/2003/01/geo/wgs84_pos#long", lon);
+		if(writeToGraph) {	
+			this.modifyAttributeDirect(res.getUri(), "http://www.w3.org/2003/01/geo/wgs84_pos#lat", lat);
+			this.modifyAttributeDirect(res.getUri(), "http://www.w3.org/2003/01/geo/wgs84_pos#long", lon);
+		}
 		res.setLat(lat);
 		res.setLon(lon);
 	//		this.sendLocationUpdateEvent(new URI(res.getUri()));
@@ -1847,6 +1848,7 @@ public class Dualist {
 			props.add(att);
 			res.setAttributes(props);
 		}
+		res.setPopulateProperties(true);
 		return res.getAttributes();
 		
 	}
@@ -2452,7 +2454,7 @@ public class Dualist {
 		}
 		GraphResource obj2 = objectCache.get(obj.getUri());
 		
-		if( obj2 != null && System.identityHashCode(obj2) != System.identityHashCode(obj2)) {
+		if( obj2 != null && System.identityHashCode(obj2) != System.identityHashCode(obj)) {
 			log.error("Trying to insert different object to cache!");
 		}
 		objectCache.put(obj.getUri(), obj);
