@@ -136,7 +136,7 @@ public class Dualist {
 	public Dualist() {
 //		GeoSPARQLConfig.setupMemoryIndex();
 		
-		model = ModelFactory.createOntologyModel();
+		model = ModelFactory.createOntologyModel(ProfileRegistry.OWL_LITE_LANG);
 		
 	
 		
@@ -231,21 +231,7 @@ public class Dualist {
 		this.baseNs = baseNs;
 	}
 
-	public void setVersionInfo( String versionInfo) {
-		
-		String ontResUri = baseNs.substring(0,baseNs.indexOf('#'));
-		
-		this.delete(new URI(ontResUri));
-		
-		Resource ontClass = model
-				.getResource("http://www.w3.org/2002/07/owl#Ontology");
-		Resource ontRes = model.createResource(ontResUri, ontClass);
-		Property versionProp = model
-				.getProperty("http://www.w3.org/2002/07/owl#versionInfo");		
-		ontRes.addLiteral(versionProp, versionInfo);
-	}
-	
-	
+
 	public void loadModelFile(String fileName, String format) {
 		InputStream in = FileManager.get().open(fileName);
 
@@ -468,20 +454,23 @@ public class Dualist {
 		return null;
 	}
 
-	public void deleteFromSpatialIndex(String uri) {
-		Point pt = (Point)resGeometries.get(uri);
+	public void deleteFromSpatialIndex(GraphResource res) {
+	//	Point pt = (Point)resGeometries.get(uri);
+		Point pt = res.getGeo();
 		if( pt != null)		
 			t.remove(pt.getEnvelopeInternal(), pt);
 	}
 	
 	public void updateSpatialIndex(GraphResource res) {
-		Point pt = (Point)resGeometries.get(res.getUri());
+	//	Point pt = (Point)resGeometries.get(res.getUri());
+	
+		Point pt = res.getGeo();
 		if( pt != null)		
 			t.remove(pt.getEnvelopeInternal(), pt);
 		pt = gf.createPoint(new Coordinate(res.getLon(), res.getLat()));
 		pt.setUserData(res);
 	    t.insert(pt.getEnvelopeInternal(), pt);
-	    resGeometries.put(res.getUri(), pt);
+//	    resGeometries.put(res.getUri(), pt);
 		
 	}	
 	
@@ -897,22 +886,24 @@ public class Dualist {
 	 * removed from the graph!!
 	 * 
 	 */
-	public void delete(GraphResource res) {
-		delete(new URI(res.getUri()));
-	}
+
+
 	/*
 	 * Delete a POJO resource from the graph. Also incoming references are
 	 * removed from the graph!!
 	 * 
 	 */
-	public void delete(URI uri) {
-		log.debug("Dualist.delete " + uri);
+	public void delete(GraphResource res) {
+		log.debug("Dualist.delete " + res.getUri());
 		try {
-		
+	
+
+			deleteFromSpatialIndex(res);
+			
 			Resource resource = null;
 
 						// check if resource exists
-			resource = model.getResource(uri.toString());
+			resource = model.getResource(res.getUri());
 			
 			if (resource == null) { // if URI is not set, create a new URI with
 									// random hash
@@ -924,9 +915,11 @@ public class Dualist {
 			// remove statements where resource is object
 			model.removeAll(null, null, resource);
 
-			objectCache.remove(uri.toString());
+			objectCache.remove(res.getUri());
 
-			deleteFromSpatialIndex(uri.toString());
+			res.setUri(null);
+			res.setType(null);
+			
 		} catch (Exception e) {
 			log.error("Exception during deleting of a graph ", e);
 		}

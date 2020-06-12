@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.dualist.ogm.Dualist;
 import org.dualist.ogm.annotations.OWLProperty;
+import org.locationtech.jts.geom.Point;
 
 public class GraphResource {
 
@@ -20,6 +21,8 @@ public class GraphResource {
 	boolean populateProperties = false;	
 	
 	boolean isReference = false;
+	
+	Point geo = null;
 	
 	@OWLProperty("http://8scale.com/wargame#name")
 	public String name;
@@ -226,6 +229,14 @@ public class GraphResource {
 
 	public void setGraph(Dualist graph) {
 		this.graph = graph;
+	}
+
+	public Point getGeo() {
+		return geo;
+	}
+
+	public void setGeo(Point geo) {
+		this.geo = geo;
 	}
 	
 	
