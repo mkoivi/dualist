@@ -20,6 +20,11 @@ public class URI {
 		return uri;
 	}
 	
+	public String getLocalUri() {
+		return uri.substring(uri.indexOf("#")+1, uri.length());
+	}
+	
+	
 	  @Override
 	    public boolean equals(Object object)
 	    {
