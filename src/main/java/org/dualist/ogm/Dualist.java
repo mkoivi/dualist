@@ -469,6 +469,7 @@ public class Dualist {
 			t.remove(pt.getEnvelopeInternal(), pt);
 		pt = gf.createPoint(new Coordinate(res.getLon(), res.getLat()));
 		pt.setUserData(res);
+		res.setGeo(pt);
 	    t.insert(pt.getEnvelopeInternal(), pt);
 //	    resGeometries.put(res.getUri(), pt);
 		
