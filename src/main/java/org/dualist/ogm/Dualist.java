@@ -214,7 +214,7 @@ public class Dualist {
 
 			}
 			else {
-				registerResourceClass( superC,  defClass);
+				registerResourceClass( uri,  defClass);
 			}
 		}
 
