@@ -185,8 +185,14 @@ public class Dualist {
 	
 	private Class resolveResourceClass(String uri) {
 		Class defClass = null;
-		defClass = resourceClasses.get(model.expandPrefix(uri));
-		
+		try {
+			defClass = resourceClasses.get(model.expandPrefix(uri));
+		}
+		catch( Exception e ) {
+			log.error("Error resolving class " + uri);
+			e.printStackTrace();
+		}
+			
 		if( defClass == null) {
 			String superC = this.getSuperClass(model.expandPrefix(uri));
 			defClass = resourceClasses.get(superC);
@@ -1552,7 +1558,6 @@ public class Dualist {
 			}
 		}
 		
-		// resolve resource type
 		String resourceType = null;
 		
 		if( types.size() == 0 ) {
