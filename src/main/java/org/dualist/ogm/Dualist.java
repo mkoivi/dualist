@@ -98,8 +98,7 @@ public class Dualist {
     HashMap<String, Geometry> resGeometries = new HashMap<>();
     
     List<String> level0Classes = new LinkedList<>();
-    List<String> level1Classes = new LinkedList<>();
-    List<String> level2Classes = new LinkedList<>();
+ 
 	
 	HashMap<String, Class> resourceClasses = new HashMap<String, Class>();
 	
@@ -180,10 +179,63 @@ public class Dualist {
 	 */
 	public void registerResourceClass(String owlClassUri, Class className) {
 		resourceClasses.put(model.expandPrefix(owlClassUri), className);
+		log.error("Registered class " + className + " for resource type " + owlClassUri);
 	}
 	
 	
 	private Class resolveResourceClass(String uri) {
+		Class defClass = null;
+		try {
+			defClass = resourceClasses.get(model.expandPrefix(uri));
+		}
+		catch( Exception e ) {
+			log.error("Error resolving class " + uri);
+			e.printStackTrace();
+		}
+			
+		if( defClass == null) {
+			String superC = this.getSuperClass(model.expandPrefix(uri));
+			if( superC != null)
+				defClass = resourceClasses.get(superC);
+			if( defClass == null) {
+				String superC2 = this.getSuperClass(superC);
+				if( superC2 != null)
+						defClass = resourceClasses.get(superC2);
+				if( defClass == null) {
+					String superC3 = this.getSuperClass(superC2);
+					if( superC3 != null)
+						defClass = resourceClasses.get(superC3);
+					if( defClass == null) {
+						String superC4 = this.getSuperClass(superC3);
+						if( superC4 != null)
+							defClass = resourceClasses.get(superC4);
+					}
+					else {
+							registerResourceClass( uri,  defClass);
+					}
+
+				}
+				else {
+					registerResourceClass( uri,  defClass);
+				}
+
+			}
+			else {
+				registerResourceClass( uri,  defClass);
+			}
+		}
+
+
+		if( defClass == null) {
+			defClass = GraphResource.class;	
+			log.error("SEVERE WARNING! Class not found for resource type: " + uri);
+		}
+		return defClass;
+	}
+	
+	
+	
+/*	private Class resolveResourceClass(String uri) {
 		Class defClass = null;
 		try {
 			defClass = resourceClasses.get(model.expandPrefix(uri));
@@ -231,7 +283,7 @@ public class Dualist {
 		}
 		return defClass;
 	}
-	
+*/	
 
 	public void setBaseNs(String baseNs) {
 		this.baseNs = baseNs;
@@ -405,7 +457,7 @@ public class Dualist {
 					if(res.getName() != null)
 						resName = res.getName() + "." + UUID.randomUUID().toString().substring(0,8);
 					else 
-						resName = UUID.randomUUID().toString().substring(0,14);
+						resName = UUID.randomUUID().toString().substring(0,13);
 					uri = namespace + resourceClass.getLocalName() + "." + resName	;
 					res.setUri(uri);
 				}
@@ -1331,19 +1383,25 @@ public class Dualist {
 		}
 		return false;
 	}
-	
-	public String getSuperClass( String child ) {
-		OntClass o = ((OntModel)model).getOntClass(model.expandPrefix(child));
 		
-		if(o== null )
+	public String getSuperClass(String child) {
+		if( child == null)
 			return null;
-		
-		OntClass superC = o.getSuperClass();
-		if( superC != null )
-			return superC.getURI();
-		return null;
+	OntClass o = ((OntModel)model).getOntClass(model.expandPrefix(child));
 	
+	if(o== null )
+		return null;
+	Iterator<OntClass> it = o.listSuperClasses();
+
+	while(it.hasNext()) {
+         OntClass par = it.next();
+		if( par.getURI().startsWith(getBaseNs())) {
+			return par.getURI();
+		}
 	}
+	return null;
+}
+	
 	
 	
 	public String getResourceType( GraphResource resource) {
@@ -1369,9 +1427,15 @@ public class Dualist {
 	}
 	
 	
-	public void initResourceTypeCache() {
+	public void initResourceTypeCache( String domainPrefix ) {
 		
-		List<URI> allClasses = this.query("SELECT DISTINCT ?result {?result rdf:type owl:Class. FILTER (isURI(?result) && STRSTARTS(str(?result), str(wargame:) ) ) }");
+	
+		List<URI> allClasses = this.query("SELECT DISTINCT ?result {?result rdf:type owl:Class. FILTER (isURI(?result) && STRSTARTS(str(?result), str("+domainPrefix+":) ) ) }");
+
+		for( URI c:allClasses) {
+			resolveResourceClass(c.toString());
+		}
+		
 		for( URI c:allClasses) {
 			OntClass o = ((OntModel)model).getOntClass(c.toString());
 			if( !o.listSubClasses().hasNext()) {
