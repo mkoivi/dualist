@@ -24,7 +24,7 @@ public class GraphResource {
 	
 	Point geo = null;
 	
-	@OWLProperty("http://8scale.com/wargame#name")
+	@OWLProperty("society:name")
 	public String name;
 	
 	List<Attribute> properties = null;

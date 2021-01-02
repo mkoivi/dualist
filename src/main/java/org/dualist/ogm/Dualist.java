@@ -228,7 +228,7 @@ public class Dualist {
 
 		if( defClass == null) {
 			defClass = GraphResource.class;	
-			log.error("SEVERE WARNING! Class not found for resource type: " + uri);
+			log.warn("WARNING! Class not found for resource type: " + uri);
 		}
 		return defClass;
 	}
