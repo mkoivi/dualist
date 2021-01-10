@@ -389,6 +389,8 @@ public class Dualist {
 			Resource resourceClass;
 			Resource resource = null;
 			
+			res.setGraph(this);
+			
 			if( convertNamespaceMode) {
 				for( String nm: namespaceMappings.keySet()) {
 					if( res.getUri().startsWith(nm)) {
@@ -454,9 +456,9 @@ public class Dualist {
 				if (uri == null) { // if URI is not set, create a new URI
 									// with random hash
 					String resName = "";					
-					if(res.getName() != null)
-						resName = res.getName() + "." + UUID.randomUUID().toString().substring(0,8);
-					else 
+				//	if(res.getName() != null)
+				//		resName = res.getName(). + "." + UUID.randomUUID().toString().substring(0,8);
+				//	else 
 						resName = UUID.randomUUID().toString().substring(0,13);
 					uri = namespace + resourceClass.getLocalName() + "." + resName	;
 					res.setUri(uri);
@@ -894,9 +896,10 @@ public class Dualist {
 	 * Warning! This method updates attribute value in graph directly and does not update POJO objects. You should always reload related POJOs after calling this method.
 	 * Method removes resource pojo from cache.
 	 * 
+	 * returns URI of the new attribute
 	 */
 	
-	public void modifyAttributeDirect(String resUri, String attribute, Object value)  {
+	public String modifyAttributeDirect(String resUri, String attribute, Object value)  {
 		Resource resource = model.getResource(model.expandPrefix(resUri));
 		Property property = model.getProperty(model.expandPrefix(attribute));
 		
@@ -911,7 +914,7 @@ public class Dualist {
 		
 	//	objectCache.remove(resUri);
 
-		
+		return property.getURI();
 		
 	}
 	/*
@@ -1680,9 +1683,10 @@ public class Dualist {
 
 		populateQueryProperties(pojoResource);
 
-	
 					
 		updateSpatialIndex( pojoResource);
+	
+		pojoResource.setGraph(this);
 		
 		return pojoResource;
 	//	pojoResource.setDirectType(this.getType(pojoResource.getUriObj()));
@@ -2607,6 +2611,7 @@ public class Dualist {
 		Resource s = model.getResource(model.expandPrefix(uri));
 		StmtIterator iter = model.listStatements( new SimpleSelector(s, null, (RDFNode) null));
 		GraphResource res = new GraphResource();
+		res.setGraph(this);
 		while (iter.hasNext()) {
 			Statement stmt = iter.nextStatement(); // get next statement
 			Resource subject = stmt.getSubject(); // get the subject

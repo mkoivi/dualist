@@ -59,15 +59,6 @@ public class GraphResource {
 		this.uri = uri;
 	}
 
-	public String getGraphUri() {
-		return graphUri;
-	}
-
-	public void setGraphUri(String graphUri) {
-		this.graphUri = graphUri;
-	}
-	
-
 	public void copy(GraphResource copy){
 		copy.graphUri = this.graphUri;
 		copy.uri = this.uri;
@@ -107,6 +98,29 @@ public class GraphResource {
 		return null;
 	}
 	
+	
+	/*
+	 * Sets an additional attribute, in graph and pojo attributes
+	 * 
+	 */
+	
+	public void setExtraAttribute( String name, String value) {
+		String attrUri = graph.modifyAttributeDirect(uri, name, value);
+		boolean exists = false;
+		for(Attribute a: getAttributes()) {
+			if( a.name.equals(name)) {
+				a.value = value;
+				exists = true;
+			}
+		}				
+		if( !exists ) {
+			Attribute a = new Attribute(name, attrUri, value);
+			properties.add(a);
+		}
+			
+		
+		
+	}
 	
 	public void setAttributes(List<Attribute> properties) {
 		this.properties = properties;
