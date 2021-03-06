@@ -401,7 +401,7 @@ public class Dualist {
 			}
 			
 			
-			log.info("Create a " + res.getClass().toString() );
+			log.debug("Create a " + res.getClass().toString() );
 			if( res.getClass().toString().contains( "org.dualist.ogm.pojo.GraphResource")) {
 				if( res.getTypes() == null) {
 					log.error("Trying to create a direct instance of GraphResource. The graph resource type MUST be defined in GraphResource.types attribute!" );
@@ -471,12 +471,12 @@ public class Dualist {
 				if( !res.getClass().toString().contains( "GraphResource"))
 					this.putToCache(res);
 				
-				log.info("Dualist.create, created " + uri);
+				log.debug("Dualist.create, created " + uri);
 				
 	//			this.sendLocationUpdateEvent(new URI(res.getUri()));
 				
 			} else {
-				log.info("Graph already contains resource with URI " + uri);
+				log.debug("Graph already contains resource with URI " + uri);
 				return resource;
 			}
 			
@@ -1122,9 +1122,9 @@ public class Dualist {
 						GraphResource resource;
 						if (objectCache.containsKey(s.toString()) ) {
 							resource = objectCache.get(s.toString());
-							log.info("cache hit (query) " + s.toString());
+							log.debug("cache hit (query) " + s.toString());
 						} else {
-							log.info("cache miss (query) " + s.toString());
+							log.debug("cache miss (query) " + s.toString());
 						
 							// Populate POJO and direct subclasses
 							resource = populateFromGraph(s);

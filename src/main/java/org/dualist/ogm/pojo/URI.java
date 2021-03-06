@@ -34,4 +34,13 @@ public class URI {
 		  return false;
 	    }
 
+	    public boolean equals(String object)
+	    {
+		  if( object.equals(uri)) {
+			   return true;
+		  }
+		  return false;
+	    }
+	  
+	  
 }
